@@ -30,7 +30,7 @@ services:
     volumes:
       - ./epusdt.conf:/app/.env
     ports:
-      - 8000:8000
+      - 8966:8000
     networks:
       - frontend
 
