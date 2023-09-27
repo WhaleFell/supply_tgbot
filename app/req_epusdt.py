@@ -31,7 +31,6 @@ class EpusdtSDK(object):
                     urls += "&"
                 sign += f"{key}={val}"
                 urls += f"{key}={urllib.parse.quote(str(val).encode())}"
-        print(f"{sign}{signKey}")
         sign = hashlib.md5(f"{sign}{signKey}".encode()).hexdigest()
         return sign
 

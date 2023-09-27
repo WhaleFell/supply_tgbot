@@ -39,6 +39,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # 2. 支付成功后,接收回调,根据 trade_id 更新状态
 
 
+class ConfigCurd(object):
+    """针对 config 的 CURD"""
+
+    @staticmethod
+    async def getConfig(session: AsyncSession) -> Config:
+        result = await session.execute(select(Config))
+        return result.scalar_one()
+
+    @staticmethod
+    async def updateConfig(session: AsyncSession, config: Config) -> Config:
+        await session.execute(update(Config).values(**config.columns_to_dict()))
+        await session.commit()
+        await session.refresh(config)
+        return config
+
+
 class UserCurd(object):
     "针对 users 的 CURD"
 
@@ -65,10 +81,18 @@ class UserCurd(object):
     @staticmethod
     async def getUserAmount(
         session: AsyncSession, user_id: Union[str, int]
-    ) -> Optional[int]:
+    ) -> Optional[float]:
         user = await UserCurd.getUserByID(session, user_id=user_id)
         if user:
             return user.amount
+
+    @staticmethod
+    async def getUserCount(
+        session: AsyncSession, user_id: Union[str, int]
+    ) -> Optional[int]:
+        user = await UserCurd.getUserByID(session, user_id=user_id)
+        if user:
+            return user.count
 
     @staticmethod
     async def setUserAmount(
@@ -80,6 +104,22 @@ class UserCurd(object):
                 update(User)
                 .where(User.user_id == user_id)
                 .values(amount=origin_amount + value)
+            )
+            return await UserCurd.getUserByID(session, user_id=user_id)
+
+        return None
+
+    @staticmethod
+    async def addUserCount(
+        session: AsyncSession, user_id: Union[str, int]
+    ) -> Optional[User]:
+        """发布次数 +1"""
+        origin_count = await UserCurd.getUserCount(session, user_id=user_id)
+        if origin_count:
+            await session.execute(
+                update(User)
+                .where(User.user_id == user_id)
+                .values(count=origin_count + 1)
             )
             return await UserCurd.getUserByID(session, user_id=user_id)
 

@@ -10,6 +10,9 @@ from sqlalchemy.ext.asyncio import (
 )
 from datetime import datetime
 
+from .database.model import User
+from .database.curd import UserCurd, ConfigCurd
+
 # ====== sqlalchemy end =====
 
 # ====== pyrogram =======
@@ -43,6 +46,11 @@ import os
 import sys
 import glob
 from asyncio import Queue
+
+# ====== Schemas ======
+
+
+# ====== Schemas end =====
 
 # ====== Config ========
 ROOTPATH: Path = Path(__file__).parent.absolute()
@@ -158,7 +166,7 @@ class Content(object):
         )
         return keyboard
 
-    def addCode(self, code: str):
+    def addCode(self, code: Any):
         return f"<code>{code}</code>"
 
     def USER_INFO(self, user: "User") -> str:
@@ -166,12 +174,12 @@ class Content(object):
 👧用户信息👧
 系统 ID: {self.addCode(user.id)}
 用户 ID:{self.addCode(user.user_id)}
-注册时间:{self.addCode(user.reg_at)}
-账号余额:{self.addCode(user.cion)} Cion
+注册时间:{self.addCode(user.create_at)}
+账号余额:{self.addCode(user.amount)} Cion
 发布次数:{self.addCode(user.count)}
 """
 
-    def PROVIDE(self) -> str:
+    async def PROVIDE(self) -> str:
         """供应方"""
         return """
 项目名称：
@@ -244,12 +252,8 @@ def remove_first_line(text: str) -> str:
 
 # ====== DB model =====
 
-engine = create_async_engine(DB_URL, pool_pre_ping=True, pool_recycle=600)
-
-# 会话构造器
-async_session: async_sessionmaker[AsyncSession] = async_sessionmaker(
-    bind=engine, expire_on_commit=False
-)
+from .database.connect import AsyncSessionMaker
+from .database.curd import UserCurd
 
 
 # ======= DB model End =====

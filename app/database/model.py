@@ -84,6 +84,7 @@ class User(Base):
         String(100), nullable=False, comment="密码", unique=True
     )
 
+    # 余额
     amount: Mapped[int] = mapped_column(
         Integer(), nullable=False, comment="用户余额", default=0
     )
@@ -95,6 +96,12 @@ class User(Base):
         comment="注册时间",
     )
 
+    # 发布次数
+    count: Mapped[int] = mapped_column(
+        nullable=False, default=0, comment="发布次数"
+    )
+
+    # 发送过的 Msg  一的一端
     msgs: Mapped[List["Msg"]] = relationship(
         "Msg", backref="users", lazy="subquery"
     )
@@ -142,9 +149,15 @@ class Config(Base):
     )
 
     channel_id: Mapped[str] = mapped_column(
-        String(20),
-        comment="机器人绑定的频道 ID",
+        String(20), comment="机器人绑定的频道 ID", nullable=True
     )
+
+    # https://stackoverflow.com/questions/1958219/how-to-convert-sqlalchemy-row-object-to-a-python-dict#34
+    def columns_to_dict(self):
+        dict_ = {}
+        for key in self.__mapper__.c.keys():
+            dict_[key] = getattr(self, key)
+        return dict_
 
 
 class Msg(Base):

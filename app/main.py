@@ -49,7 +49,7 @@ try:
 except Exception as e:
     # run with uvicorn add the async function to main event loop
     logger.info(f"run in uvicorn {e}")
-    asyncio.ensure_future(init_table(is_drop=False))
+    asyncio.ensure_future(init_table(is_drop=True))
 
 logger.info("The FastAPI Start Success!")
 

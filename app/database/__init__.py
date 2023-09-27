@@ -4,7 +4,8 @@
 # schemas 响应数据模型
 
 from .connect import async_engine
-from .model import Base, User
+from .model import Base, User, Config
+from .connect import AsyncSessionMaker
 from app.utils.custom_log import logger
 
 
@@ -15,6 +16,11 @@ async def init_table(is_drop: bool = True):
     try:
         async with async_engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+
+        async with AsyncSessionMaker() as session:
+            session.add(Config())
+            await session.commit()
+
         logger.info("创建表成功!!!")
     except Exception as e:
         logger.error(f"创建表失败!!! -- 错误信息如下:\n{e}")
