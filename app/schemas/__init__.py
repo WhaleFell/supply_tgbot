@@ -6,4 +6,4 @@
 # 注意要和 SQLAlchemy 模型分开
 
 from .base import BaseResp
-from .user import UserResp, BMUser, Token
+from .epusdt import Epusdt

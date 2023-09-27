@@ -28,7 +28,9 @@ class Settings(BaseSettings):
     # SQLTIE3 sqlite+aiosqlite:///database.db  # 数据库文件名为 database.db 不存在的新建一个
     # 异步 mysql+aiomysql://user:password@host:port/dbname
     # DB_URL = os.environ.get("DB_URL") or "mysql+aiomysql://root:123456@localhost/tgforward?charset=utf8mb4"
-    DATABASE_URI: str = "sqlite+aiosqlite:///database.db"
+    DATABASE_URI: str = (
+        "mysql+aiomysql://root:123456@localhost/tgsupply?charset=utf8mb4"
+    )
     DATABASE_ECHO: bool = False  # 是否打印数据库日志 (可看到创建表、表数据增删改查的信息)
 
     # logger config

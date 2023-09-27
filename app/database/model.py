@@ -26,6 +26,7 @@ from sqlalchemy import (
     String,
     DateTime,
     Integer,
+    Float,
 )
 
 # sqlalchemy asynchronous support
@@ -75,12 +76,12 @@ class User(Base):
 
     # 用户名
     username: Mapped[str] = mapped_column(
-        String(100), nullable=False, comment="用户名", unique=True
+        String(100), nullable=True, comment="用户名"
     )
 
     # 用户唯一 ID
     user_id: Mapped[str] = mapped_column(
-        String(100), nullable=False, comment="密码"
+        String(100), nullable=False, comment="密码", unique=True
     )
 
     amount: Mapped[int] = mapped_column(
@@ -103,24 +104,27 @@ class Config(Base):
     __tablename__ = "config"
     __table_args__ = {"comment": "配置表"}
 
+    # 数据库主键
+    id: Mapped[IDPK]
+
     admin_password: Mapped[str] = mapped_column(
         String(100), default="admin", comment="管理员密码"
     )
 
     description: Mapped[str] = mapped_column(
-        String(10000),
+        String(1000),
         default=StringTemplate.description,
         comment="机器人 /start 时的描述",
     )
 
     provide_desc: Mapped[str] = mapped_column(
-        String(10000),
+        String(1000),
         default=StringTemplate.provide_desc,
         comment="供给方描述",
     )
 
     require_desc: Mapped[str] = mapped_column(
-        String(10000),
+        String(1000),
         default=StringTemplate.require_desc,
         comment="需求方描述",
     )
@@ -135,6 +139,11 @@ class Config(Base):
         Integer,
         default=2,
         comment="一次发送消耗的 USDT",
+    )
+
+    channel_id: Mapped[str] = mapped_column(
+        String(20),
+        comment="机器人绑定的频道 ID",
     )
 
 
@@ -155,7 +164,7 @@ class Msg(Base):
 
 
 class Pay(Base):
-    __tablename__ = "pay"
+    __tablename__ = "pays"
     __table_args__ = {"comment": "支付记录表"}
 
     # 数据库主键
@@ -163,4 +172,22 @@ class Pay(Base):
 
     user_id: Mapped[str] = mapped_column(
         String(20), ForeignKey("users.id"), comment="支付的用户 ID"
+    )
+
+    # 唯一订单号
+    trade_id: Mapped[str] = mapped_column(
+        String(100), comment="订单号", unique=True
+    )
+
+    amount: Mapped[float] = mapped_column(Float(precision=2), comment="金额")
+
+    pay_at: Mapped[datetime] = mapped_column(
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+        comment="交易时间 自动生成自动更新",
+    )
+
+    status: Mapped[int] = mapped_column(
+        Integer, comment="交易状态 1:等待支付 2:支付成功 3:已过期", default=1
     )

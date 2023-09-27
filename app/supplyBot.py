@@ -50,41 +50,15 @@ DEBUG = True
 NAME = os.environ.get("NAME") or "WFTest8964Bot"
 # SQLTIE3 sqlite+aiosqlite:///database.db  # 数据库文件名为 database.db 不存在的新建一个
 # 异步 mysql+aiomysql://user:password@host:port/dbname
-DB_URL = (
-    os.environ.get("DB_URL")
-    or "mysql+aiomysql://root:123456@localhost/supplyTGBot?charset=utf8mb4"
-)
 API_ID = 21341224
 API_HASH = "2d910cf3998019516d6d4bbb53713f20"
 SESSION_PATH: Path = Path(ROOTPATH, "sessions", f"{NAME}.txt")
 # 需要发布的 Channle ID
-CHANNEL_ID: int = -1001858197255
-amount = 1  # 发布一次消耗的 Cion
-__desc__ = f"""
-发布规则 付费广告 消耗 {amount} Cion
-
-发布付费广告严格要求如下
-1：行数限制15行内【超过百分百不通过】
-2：禁止发布虚假内容，禁止诈骗欺骗用户🚫
-3：无需备注累计广告次数，机器人会自动统计
-
-请编写好广告词，点击下方【📝自助发布】
-
-供给频道： https://t.me/gcccaasas
-(当前处于测试阶段,每人开始就有 100 Cion 即可以发布 100 次,如果需要充值,请联系管理员)
-"""
 # ====== Config End ======
 
 # ===== logger ====
-logger.remove()
-logger.add(
-    sys.stdout,
-    colorize=True,
-    format="<green>{time:HH:mm:ss}</green> | {name}:{function} {level} | <level>{message}</level>",
-    level="DEBUG" if DEBUG else "INFO",
-    backtrace=True,
-    diagnose=True,
-)
+from .utils.custom_log import logger
+
 # ===== logger end =====
 
 # ===== error handle =====
