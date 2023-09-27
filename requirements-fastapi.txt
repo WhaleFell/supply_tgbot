@@ -1,0 +1,11 @@
+uvicorn
+fastapi
+pydantic
+pydantic-settings
+loguru
+sqlalchemy
+sqlalchemy[asyncio]
+aiosqlite
+aiomysql
+pymysql
+orjson
