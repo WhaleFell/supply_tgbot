@@ -152,3 +152,15 @@ class Msg(Base):
     content: Mapped[str] = mapped_column(
         String(1000), comment="发送的内容", nullable=False
     )
+
+
+class Pay(Base):
+    __tablename__ = "pay"
+    __table_args__ = {"comment": "支付记录表"}
+
+    # 数据库主键
+    id: Mapped[IDPK]
+
+    user_id: Mapped[str] = mapped_column(
+        String(20), ForeignKey("users.id"), comment="支付的用户 ID"
+    )
