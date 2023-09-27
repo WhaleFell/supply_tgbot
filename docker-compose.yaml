@@ -11,6 +11,8 @@ services:
       - MYSQL_PASSWORD=lovehyy
     volumes:
       - ./mysql:/var/lib/mysql
+    ports:
+      - 3384:3306
     networks:
       - frontend
 
