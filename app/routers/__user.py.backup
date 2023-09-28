@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # user router 用户路由
+# type: ignore
 
 """
 Reference:

@@ -20,6 +20,7 @@ from app.database.curd import PayCurd
 from app.database.model import Pay, User
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func
 
 router = APIRouter()
 
@@ -48,3 +49,13 @@ async def get_all_pay(
     pays = await PayCurd.getAllPay(session=db)
 
     return ORJSONResponse(content=jsonable_encoder(pays))
+
+
+@router.get("/total_amount/", description="获取所有支付记录的所有金额合计")
+async def get_total_amount(
+    db: Annotated[AsyncSession, Depends(get_session)],
+) -> PlainTextResponse:
+    result = await db.execute(func.sum(Pay.amount))
+    total: float = result.scalar()  # type: ignore
+
+    return PlainTextResponse(content=str(round(total, 2)))

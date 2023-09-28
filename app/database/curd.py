@@ -161,6 +161,14 @@ class UserCurd(object):
 
         return user
 
+    @staticmethod
+    async def getAllUser(
+        session: AsyncSession,
+    ) -> Union[List[User], Sequence[User]]:
+        """获取所有用户信息"""
+        result = await session.scalars(select(User))
+        return result.all()
+
 
 class PayCurd(object):
     """针对 pays 的 CURD"""

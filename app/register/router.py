@@ -6,7 +6,7 @@
 from fastapi import FastAPI, Depends
 
 from app.config import settings
-from app.routers import index, pay_callback, set_config
+from app.routers import index, pay_callback, set_config, user
 
 
 def register_router(app: FastAPI):
@@ -20,3 +20,4 @@ def register_router(app: FastAPI):
     # app.include_router(user.router, tags=["user"], prefix="/user")
     app.include_router(pay_callback.router, tags=["pay"], prefix="/pay")
     app.include_router(set_config.router, tags=["config"], prefix="/config")
+    app.include_router(user.router, tags=["user"], prefix="/user")

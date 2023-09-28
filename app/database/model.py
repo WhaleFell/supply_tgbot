@@ -119,6 +119,11 @@ class User(Base):
         "Msg", backref="users", lazy="subquery"
     )
 
+    # 支付记录
+    pays: Mapped[List["Pay"]] = relationship(
+        "Pay", backref="users", lazy="subquery"
+    )
+
     @classmethod
     def generateUser(cls: Type["User"], message: Message) -> "User":
         """根据信息生成 User 对象"""
@@ -226,7 +231,7 @@ class Msg(Base):
     id: Mapped[IDPK]
 
     user_id: Mapped[str] = mapped_column(
-        String(20), ForeignKey("users.id"), comment="发送的用户ID"
+        String(20), ForeignKey("users.user_id"), comment="发送的用户ID"
     )
 
     content: Mapped[str] = mapped_column(
@@ -249,7 +254,7 @@ class Pay(Base):
     id: Mapped[IDPK]
 
     user_id: Mapped[str] = mapped_column(
-        String(20), ForeignKey("users.id"), comment="支付的用户 ID"
+        String(20), ForeignKey("users.user_id"), comment="支付的用户 ID"
     )
 
     # 唯一订单号

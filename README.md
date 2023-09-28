@@ -8,6 +8,13 @@
 
 [https://github.com/assimon/epusdt](https://github.com/assimon/epusdt)
 
+## 部署
+
+```shell
+docker build -t tgbot DockerfileTGBot
+docker build -t fastapi DockerfileFastAPI
+```
+
 ## Docker-compose.yaml
 
 ```yaml

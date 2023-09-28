@@ -1,16 +1,22 @@
+# Telegram Supply Bot 
+
 version: "3"
+
 services:
   db:
     image: mariadb:focal
     restart: always
     container_name: db
     environment:
+      - SET_CONTAINER_TIMEZONE=true
+      - CONTAINER_TIMEZONE=Asia/Shanghai
+      - TZ=Asia/Shanghai
       - MYSQL_ROOT_PASSWORD=lovehyy
       - MYSQL_DATABASE=epusdt
       - MYSQL_USER=epusdt
       - MYSQL_PASSWORD=lovehyy
     volumes:
-      - ./mysql:/var/lib/mysql
+      - ./wkdata/mysql:/var/lib/mysql
     ports:
       - 3384:3306
     networks:
@@ -19,20 +25,70 @@ services:
   redis:
     image: redis:alpine
     container_name: redis
+    environment:
+      - SET_CONTAINER_TIMEZONE=true
+      - CONTAINER_TIMEZONE=Asia/Shanghai
+      - TZ=Asia/Shanghai
     restart: always
     volumes:
-      - ./redis:/data
+      - ./wkdata/redis:/data
     networks:
       - frontend
-
+    
   epusdt:
     image: stilleshan/epusdt
     container_name: epusdt
+    environment:
+      - SET_CONTAINER_TIMEZONE=true
+      - CONTAINER_TIMEZONE=Asia/Shanghai
+      - TZ=Asia/Shanghai
     restart: always
     volumes:
       - ./epusdt.conf:/app/.env
     ports:
-      - 8966:8000
+      - 8445:8000
+    networks:
+      - frontend
+  
+  fastapi:
+    image: fastapi
+    container_name: supply_fastapi
+    environment:
+      - SET_CONTAINER_TIMEZONE=true
+      - CONTAINER_TIMEZONE=Asia/Shanghai
+      - TZ=Asia/Shanghai
+      - DATABASE_URI=mysql+aiomysql://root:lovehyy@db/tgsupply?charset=utf8mb4
+      - EPUSDT_CALLBACK_URL=http://supply_fastapi:8100/pay/callback
+      - EPUSDT_BACKEND=http://epusdt:8000/
+      - EPUSDT_KEY=lovehyy9420
+    restart: always
+    volumes:
+      - ./app/:/wkdir/app/
+    ports:
+      - 8444:8000
+    command: |
+      uvicorn app.main:app --port 8100 --host 0.0.0.0
+    networks:
+      - frontend
+
+  tgbot:
+    image: tgbot
+    container_name: supply_tgbot
+    environment:
+      - SET_CONTAINER_TIMEZONE=true
+      - CONTAINER_TIMEZONE=Asia/Shanghai
+      - TZ=Asia/Shanghai
+      - DATABASE_URI=mysql+aiomysql://root:lovehyy@db/tgsupply?charset=utf8mb4
+      - EPUSDT_CALLBACK_URL=http://supply_fastapi:8100/pay/callback
+      - EPUSDT_BACKEND=http://epusdt:8000/
+      - EPUSDT_KEY=lovehyy9420
+    restart: always
+    volumes:
+      - ./app/:/wkdir/app/
+    ports:
+      - 8444:8000
+    command: |
+      python -m app.supplyBot
     networks:
       - frontend
 
