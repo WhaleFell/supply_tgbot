@@ -65,7 +65,7 @@ services:
     volumes:
       - ./app/:/wkdir/app/
     ports:
-      - 8456:8000
+      - 8456:8100
     command: |
       uvicorn app.main:app --port 8100 --host 0.0.0.0
     networks:
