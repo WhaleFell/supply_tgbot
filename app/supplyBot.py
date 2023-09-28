@@ -177,6 +177,8 @@ class CallBackData:
     NO = "NO"
     RETURN = "return"
 
+    PAY: str = "pay"
+
 
 class Content(object):
     ZZFB = "💫自助发布"
@@ -237,7 +239,7 @@ class Content(object):
             config: Config = await ConfigCurd.getConfig(session)
             return config.require_desc
 
-    async def onceCost(self) -> int:
+    async def onceCost(self) -> float:
         async with AsyncSessionMaker() as session:
             config: Config = await ConfigCurd.getConfig(session)
             return config.once_cost
@@ -248,6 +250,22 @@ class Content(object):
         keyboard.row(
             InlineButton(text="✅确定", callback_data=CallBackData.YES),
             InlineButton(text="❌取消", callback_data=CallBackData.RETURN),
+        )
+        return keyboard
+
+    def choosePayAmountButton(self) -> InlineKeyboardMarkup:
+        keyboard = InlineKeyboard()
+        keyboard.row(
+            InlineButton(text="0.1", callback_data=f"{CallBackData.PAY}/0.1"),
+            InlineButton(text="5", callback_data=f"{CallBackData.PAY}/5"),
+            InlineButton(text="10", callback_data=f"{CallBackData.PAY}/10"),
+            InlineButton(text="20", callback_data=f"{CallBackData.PAY}/20"),
+        )
+        keyboard.row(
+            InlineButton(text="50", callback_data=f"{CallBackData.PAY}/50"),
+            InlineButton(text="100", callback_data=f"{CallBackData.PAY}/100"),
+            InlineButton(text="200", callback_data=f"{CallBackData.PAY}/200"),
+            InlineButton(text="500", callback_data=f"{CallBackData.PAY}/500"),
         )
         return keyboard
 
@@ -288,6 +306,14 @@ def try_int(string: str) -> Union[str, int]:
         return string
 
 
+def try_float(s: str) -> Optional[float]:
+    try:
+        f = float(s)
+        return f
+    except ValueError:
+        return None
+
+
 def remove_first_line(text: str) -> str:
     lines = text.split("\n")
     return "\n".join(lines[1:])
@@ -302,12 +328,31 @@ def remove_first_line(text: str) -> str:
 @app.on_callback_query()
 @capture_err
 async def handle_callback_query(client: Client, callback_query: CallbackQuery):
+    """处理按钮回调数据"""
     await cd.addCallback(callback_query)
 
     # 返回
     if callback_query.data == CallBackData.RETURN:
         await callback_query.message.reply_text(
             text=await content.start(), reply_markup=content.KEYBOARD()
+        )
+    # 充值
+    elif callback_query.data.startswith(CallBackData.PAY):  # type: ignore
+        amount: str = callback_query.data.split("/")[-1]  # type: ignore
+
+        trade_id, actual_amount, token = await epsdk.createPay(amount=amount)
+        async with AsyncSessionMaker() as session:
+            pay = Pay(
+                user_id=callback_query.from_user.id,
+                trade_id=trade_id,
+                amount=amount,
+            )
+            rePay = await PayCurd.createNewPay(session, pay=pay)
+
+        await callback_query.message.edit(
+            text=content.PAY_INFO(
+                pay=rePay, actual_amount=actual_amount, token=token
+            )
         )
 
 
@@ -398,47 +443,16 @@ async def send_channel_message(client: Client, message: Message):
             )
 
 
-def str_to_float(s: str) -> Optional[float]:
-    try:
-        f = float(s)
-        return f
-    except ValueError:
-        return None
-
-
 @app.on_message(
     filters=filters.regex(content.WYCZ) & filters.private & ~filters.me
 )
 @capture_err
 async def pay_usdt(client: Client, message: Message):
-    # TODO: support amount button
-    msg: Optional[Message] = await askQuestion(
-        queston="请输入你要充值的金额,必须是一个小数或者整数!",
-        client=client,
-        message=message,
-        timeout=200,
-    )
-    if not msg:
-        return
-
-    amount = str_to_float(msg.text)
-    if amount == None:
-        await message.reply(f"输入的参数有错误!{msg.text}")
-        return
-
-    trade_id, actual_amount, token = await epsdk.createPay(amount=amount)
-    async with AsyncSessionMaker() as session:
-        pay = Pay(
-            user_id=message.from_user.id,
-            trade_id=trade_id,
-            amount=amount,
-        )
-        rePay = await PayCurd.createNewPay(session, pay=pay)
+    # support amount button
 
     await message.reply(
-        text=content.PAY_INFO(
-            pay=rePay, actual_amount=actual_amount, token=token
-        )
+        text="请选择你要充值的USDT:**(0.1为测试平台所用)**",
+        reply_markup=content.choosePayAmountButton(),
     )
 
 

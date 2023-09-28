@@ -41,13 +41,15 @@ class EpusdtSDK(object):
             pass
 
         try:
-            return float("%.2f" % amount)
+            return float(amount)
         except:
             pass
 
         raise EpusdtException(f"{amount} 格式化错误!")
 
-    async def createPay(self, amount: float) -> Tuple[str, str, str]:
+    async def createPay(
+        self, amount: Union[str, float, int]
+    ) -> Tuple[str, str, str]:
         """
         请求 EPusdt API 新建一个交易,返回交易的 trade_id:str actual_amount:str 实际交易的金额 token:str 交易的 token
         """

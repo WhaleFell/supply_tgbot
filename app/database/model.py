@@ -98,8 +98,8 @@ class User(Base):
     )
 
     # 余额
-    amount: Mapped[int] = mapped_column(
-        Integer(), nullable=False, comment="用户余额", default=0
+    amount: Mapped[float] = mapped_column(
+        Float(precision=2), nullable=False, comment="用户余额", default=0
     )
 
     # 注册时间,由数据库生成
@@ -163,8 +163,8 @@ class Config(Base):
         comment="发送频道描述",
     )
 
-    once_cost: Mapped[int] = mapped_column(
-        Integer,
+    once_cost: Mapped[float] = mapped_column(
+        Float(precision=2),
         default=2,
         comment="一次发送消耗的 USDT",
     )
