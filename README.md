@@ -11,8 +11,9 @@
 ## 部署
 
 ```shell
-docker build -t tgbot DockerfileTGBot
-docker build -t fastapi DockerfileFastAPI
+docker build -t tgbot -f ./DockerfileTGBot .
+docker build -t fastapi -f ./DockerfileFastAPI .
+docker-compose up -d
 ```
 
 ## Docker-compose.yaml

@@ -65,7 +65,7 @@ services:
     volumes:
       - ./app/:/wkdir/app/
     ports:
-      - 8444:8000
+      - 8456:8000
     command: |
       uvicorn app.main:app --port 8100 --host 0.0.0.0
     networks:
@@ -85,8 +85,6 @@ services:
     restart: always
     volumes:
       - ./app/:/wkdir/app/
-    ports:
-      - 8444:8000
     command: |
       python -m app.supplyBot
     networks:
