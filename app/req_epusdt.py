@@ -66,7 +66,12 @@ class EpusdtSDK(object):
                 url=f"{self.base_url}/api/v1/order/create-transaction",
                 json=data,
             )
-            jdata = result.json()
+            try:
+                jdata = result.json()
+            except:
+                raise EpusdtException(
+                    f"json encode error:{result.text} url:{result.url}"
+                )
             if jdata["status_code"] == 200:
                 return (
                     jdata["data"]["trade_id"],
