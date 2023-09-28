@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pydantic import BaseModel, Field
 from datetime import datetime
 from enum import Enum
+from typing import Optional
 
 
 # parameter
@@ -17,10 +18,10 @@ from enum import Enum
 
 
 class CustomParam(BaseModel):
-    costAmount: int
-    count: int
+    costAmount: Optional[int] = None
+    count: Optional[int] = None
     currentTime: datetime = Field(default_factory=datetime.now)
-    sendCountent: str
+    sendCountent: Optional[str] = None
 
 
 @dataclass

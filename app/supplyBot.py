@@ -8,10 +8,15 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     AsyncSession,
 )
+from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime
 
-from .database.model import User
-from .database.curd import UserCurd, ConfigCurd
+from app.database.model import User, Config, Pay, Msg
+from app.database.curd import UserCurd, ConfigCurd, MsgCURD
+
+from app.database.connect import AsyncSessionMaker
+from app.database.string_template import CustomParam
+from app.database import init_table
 
 # ====== sqlalchemy end =====
 
@@ -28,7 +33,6 @@ from pyrogram.types import (
     CallbackQuery,
     InlineKeyboardButton,
 )
-from pyrogram.handlers import MessageHandler
 from pyrogram.enums import ParseMode
 
 # ====== pyrogram end =====
@@ -61,13 +65,13 @@ NAME = os.environ.get("NAME") or "WFTest8964Bot"
 API_ID = 21341224
 API_HASH = "2d910cf3998019516d6d4bbb53713f20"
 SESSION_PATH: Path = Path(ROOTPATH, "sessions", f"{NAME}.txt")
-# 需要发布的 Channle ID
 # ====== Config End ======
 
 # ===== logger ====
 from .utils.custom_log import logger
 
 # ===== logger end =====
+
 
 # ===== error handle =====
 
@@ -82,10 +86,20 @@ def capture_err(func):
         try:
             return await func(client, message, *args, **kwargs)
         except asyncio.exceptions.TimeoutError:
+            logger.error("回答超时！")
             if isinstance(message, Message):
                 await message.reply(f"回答超时,请重来！")
-            logger.error("回答超时！")
+        except SQLAlchemyError as err:
+            logger.error(f"SQL Error:{err}")
+            if isinstance(message, CallbackQuery):
+                await message.message.reply(
+                    f"机器人按钮回调数据库 Panic 了请重试:\n<code>{err}</code>"
+                )
+            else:
+                await message.reply(f"机器人数据库 Panic 了请重试:\n<code>{err}</code>")
+            raise err
         except Exception as err:
+            logger.error(f"TGBot Error:{err}")
             if isinstance(message, CallbackQuery):
                 await message.message.reply(
                     f"机器人按钮回调 Panic 了:\n<code>{err}</code>"
@@ -179,30 +193,35 @@ class Content(object):
 发布次数:{self.addCode(user.count)}
 """
 
+    async def start(self) -> str:
+        """bot description"""
+        async with AsyncSessionMaker() as session:
+            config: Config = await ConfigCurd.getConfig(session)
+            config = config.replaceConfig(custom=CustomParam())  # type: ignore
+            return config.description
+
     async def PROVIDE(self) -> str:
         """供应方"""
-        return """
-项目名称：
-项目介绍：
-价格：
-联系人：
-频道：【选填/没频道可以不填】
-"""
+        async with AsyncSessionMaker() as session:
+            config: Config = await ConfigCurd.getConfig(session)
+            return config.provide_desc
 
-    def REQUIRE(self) -> str:
+    async def REQUIRE(self) -> str:
         """需求方"""
-        return """
-需求：
-预算：
-联系人：
-频道：【选填/没频道可以不填】
-"""
+        async with AsyncSessionMaker() as session:
+            config: Config = await ConfigCurd.getConfig(session)
+            return config.require_desc
+
+    async def onceCost(self) -> int:
+        async with AsyncSessionMaker() as session:
+            config: Config = await ConfigCurd.getConfig(session)
+            return config.once_cost
 
     def confirmButton(self) -> InlineKeyboardMarkup:
         """确定/取消按钮"""
         keyboard = InlineKeyboard()
         keyboard.row(
-            InlineButton(text="☑确定", callback_data=CallBackData.YES),
+            InlineButton(text="✅确定", callback_data=CallBackData.YES),
             InlineButton(text="❌取消", callback_data=CallBackData.RETURN),
         )
         return keyboard
@@ -227,7 +246,7 @@ async def askQuestion(
     queston: str, client: Client, message: Message, timeout: int = 200
 ) -> Union[Message, bool]:
     try:
-        ans: Message = await message.chat.ask(queston, timeout=timeout)
+        ans: Message = await message.chat.ask(queston, timeout=timeout)  # type: ignore
         return ans
     except pyromod.listen.ListenerTimeout:
         await message.reply(f"超时 {timeout}s,请重新 /start 开始")
@@ -250,13 +269,6 @@ def remove_first_line(text: str) -> str:
 
 # ====== helper function end ====
 
-# ====== DB model =====
-
-from .database.connect import AsyncSessionMaker
-from .database.curd import UserCurd
-
-
-# ======= DB model End =====
 
 # ===== Handle ======
 
@@ -269,7 +281,7 @@ async def handle_callback_query(client: Client, callback_query: CallbackQuery):
     # 返回
     if callback_query.data == CallBackData.RETURN:
         await callback_query.message.reply_text(
-            __desc__, reply_markup=content.KEYBOARD()
+            text=await content.start(), reply_markup=content.KEYBOARD()
         )
 
 
@@ -278,14 +290,16 @@ async def handle_callback_query(client: Client, callback_query: CallbackQuery):
 )
 @capture_err
 async def start(client: Client, message: Message):
-    await message.reply_text(__desc__, reply_markup=content.KEYBOARD())
+    await message.reply_text(
+        text=await content.start(), reply_markup=content.KEYBOARD()
+    )
 
 
 @app.on_message(
     filters=filters.regex(content.ZZFB) & filters.private & ~filters.me
 )
 @capture_err
-async def sendSupply(client: Client, message: Message):
+async def choose_privide_or_require(client: Client, message: Message):
     await message.reply(
         text="请选择需求还是供应",
         reply_markup=InlineKeyboardMarkup(
@@ -293,11 +307,11 @@ async def sendSupply(client: Client, message: Message):
                 [
                     InlineKeyboardButton(  # Generates a callback query when pressed
                         "供给模板",
-                        switch_inline_query_current_chat=content.PROVIDE(),
+                        switch_inline_query_current_chat=await content.PROVIDE(),
                     ),
                     InlineKeyboardButton(  # Generates a callback query when pressed
                         "需求模板",
-                        switch_inline_query_current_chat=content.REQUIRE(),
+                        switch_inline_query_current_chat=await content.REQUIRE(),
                     ),
                 ],
             ]
@@ -307,53 +321,71 @@ async def sendSupply(client: Client, message: Message):
 
 @app.on_message(filters=filters.regex(r"^@.*") & filters.private & ~filters.me)
 @capture_err
-async def atMessage(client: Client, message: Message):
+async def send_channel_message(client: Client, message: Message):
     raw_text = remove_first_line(message.text)
     msg: Message = await message.reply(
-        text=f"您的供给需求信息,是否确定发送,发送成功后将扣除 {amount} Cion:\n<code>{raw_text}</code>",
+        text=f"您的供给需求信息,是否确定发送,发送成功后将扣除 {await content.onceCost()} Cion:\n<code>{raw_text}</code>",
         reply_markup=content.confirmButton(),
     )
     cq: CallbackQuery = await cd.moniterCallback(msg, timeout=20)
 
     if cq.data == CallBackData.YES:
-        user = await manager.register(user_id=message.from_user.id)
-        count = await manager.getOrSetCount(user=user)
-        text = f"""
-{raw_text}
+        async with AsyncSessionMaker() as session:
+            user = await UserCurd.registerUser(
+                session, user=User.generateUser(message)
+            )
 
-**该用户累计发布 {count+1} 次广告**
-"""
+            if user.amount <= 0:
+                await message.reply("💔💔💔对不起,你的没钱了,赶紧充值！！！")
+                return
 
-        await client.send_message(
-            chat_id=CHANNEL_ID, text=text, reply_markup=content.channelButton()
-        )
+            config: Config = await ConfigCurd.getConfig(session)
+            config = config.replaceConfig(
+                custom=CustomParam(sendCountent=raw_text, count=user.count + 1)
+            )
 
-        user_end = await manager.pay(user=user, amount=-amount)
-        await msg.edit_text(
-            text=f"供需发送频道成功,您的信息:\n{content.USER_INFO(user_end)}"
-        )
+            await client.send_message(
+                chat_id=try_int(config.channel_id),
+                text=config.send_content,
+                reply_markup=content.channelButton(),
+            )
+
+            # 发送成功后付费
+            user_end = await UserCurd.pay(session, user)
+            # 并记录用户发送的信息
+            send_msg: Msg = await MsgCURD.addMsg(
+                session, msg=Msg(user_id=user_end.user_id, content=raw_text)
+            )
+
+            await session.commit()
+            await msg.edit_text(
+                text=f"供需发送频道成功,您的信息:\n{content.USER_INFO(user_end)}\n发送时间:{send_msg.send_at}"
+            )
 
 
 @app.on_message(
     filters=filters.regex(content.WYCZ) & filters.private & ~filters.me
 )
 @capture_err
-async def addCion(client: Client, message: Message):
-    await message.reply_text("请联系管理员充值")
+async def pay_usdt(client: Client, message: Message):
+    await message.reply_text("usdt 充值")
 
 
 @app.on_message(
     filters=filters.regex(content.GRZX) & filters.private & ~filters.me
 )
 @capture_err
-async def accountCenter(client: Client, message: Message):
-    user = await manager.searchUser(user_id=message.from_user.id)
-    if not user:
-        await message.reply_text("用户未注册!正在注册!")
+async def account_info(client: Client, message: Message):
+    async with AsyncSessionMaker() as session:
+        user = await UserCurd.getUserByID(session, user_id=message.from_user.id)
+        if not user:
+            await message.reply_text("用户未注册!正在注册!")
 
-    user = await manager.register(user_id=message.from_user.id)
+        user = await UserCurd.registerUser(
+            session, user=User.generateUser(message)
+        )
 
-    await message.reply_text(f"{content.USER_INFO(user)}")
+        await message.reply_text(f"{content.USER_INFO(user)}")
 
 
 @app.on_message(filters=filters.command("getID") & ~filters.me)
@@ -370,9 +402,6 @@ async def main():
     await app.start()
     user = await app.get_me()
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
     # ===== Test Code =======
     # chat_id = await app.get_chat("@w2ww2w2w")
     # print(chat_id)
@@ -388,6 +417,9 @@ type: {"Bot" if user.is_bot else "User"}
 ----------------------------
 """
     )
+    logger.info("初始化数据库..")
+
+    await init_table(is_drop=False)
 
     await app.set_bot_commands(
         [

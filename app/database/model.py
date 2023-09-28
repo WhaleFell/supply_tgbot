@@ -11,13 +11,14 @@
     [3]: https://docs.sqlalchemy.org/en/20/orm/declarative_mixins.html#composing-mapped-hierarchies-with-mixins
     [4]: https://docs.sqlalchemy.org/en/20/orm/declarative_config.html#other-declarative-mapping-directives
 """
-
 import asyncio
-from typing import List, Dict, Optional, Mapping
+from typing import List, Dict, Optional, Mapping, Type, TypeVar
+import typing
 from typing_extensions import Annotated
 from datetime import datetime, timedelta
 
 # sqlalchemy type
+import sqlalchemy.orm
 from sqlalchemy import (
     ForeignKey,
     func,
@@ -45,7 +46,9 @@ from sqlalchemy.orm import (
     relationship,
 )
 
-from .string_template import StringTemplate
+import inspect
+
+from .string_template import StringTemplate, CustomParam
 
 # 主键 ID
 # https://docs.sqlalchemy.org/en/20/orm/declarative_tables.html#mapping-whole-column-declarations-to-python-types
@@ -65,6 +68,16 @@ class Base(AsyncAttrs, DeclarativeBase):
         "mysql_charset": "utf8mb4",  # 设置表的字符集
         "mysql_collate": "utf8mb4_general_ci",  # 设置表的校对集
     }
+
+    # def __repr__(self) -> str:
+    #     cls = type(self).__name__
+    #     fields = inspect.getmembers(self, lambda x: not inspect.isroutine(x))
+    #     fields = [f for f in fields if not f[0].startswith("_")]
+    #     args = ", ".join(f"{f[0]}={repr(f[1])}" for f in fields)
+    #     return f"<{cls}({args})>"
+
+
+from pyrogram.types import Message
 
 
 class User(Base):
@@ -105,6 +118,14 @@ class User(Base):
     msgs: Mapped[List["Msg"]] = relationship(
         "Msg", backref="users", lazy="subquery"
     )
+
+    @classmethod
+    def generateUser(cls: Type["User"], message: Message) -> "User":
+        """根据信息生成 User 对象"""
+        return cls(
+            username=message.from_user.username,
+            user_id=message.from_user.id,
+        )
 
 
 class Config(Base):
@@ -149,8 +170,29 @@ class Config(Base):
     )
 
     channel_id: Mapped[str] = mapped_column(
-        String(20), comment="机器人绑定的频道 ID", nullable=True
+        String(20),
+        comment="机器人绑定的频道 ID",
+        nullable=False,
+        default="-1001858197255",
     )
+
+    def replaceConfig(self, custom: CustomParam) -> "Config":
+        return Config(
+            id=self.id,
+            admin_password=self.admin_password,
+            description=self.description.replace(
+                "【每次消耗的USDT】", str(self.once_cost)
+            ),
+            provide_desc=self.provide_desc,
+            require_desc=self.require_desc,
+            send_content=self.send_content.replace("【发表次数】", str(custom.count))
+            .replace(
+                "【当前时间】", custom.currentTime.strftime(r"%Y-%m-%d %H:%M:%S")
+            )
+            .replace("【用户内容】", str(custom.sendCountent)),
+            once_cost=self.once_cost,
+            channel_id=self.channel_id,
+        )
 
     # https://stackoverflow.com/questions/1958219/how-to-convert-sqlalchemy-row-object-to-a-python-dict#34
     def columns_to_dict(self):
@@ -173,6 +215,13 @@ class Msg(Base):
 
     content: Mapped[str] = mapped_column(
         String(1000), comment="发送的内容", nullable=False
+    )
+
+    # 发送时间,由数据库生成
+    send_at: Mapped[datetime] = mapped_column(
+        nullable=False,
+        server_default=func.now(),
+        comment="注册时间",
     )
 
 

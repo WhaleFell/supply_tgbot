@@ -8,6 +8,7 @@ from .connect import AsyncSessionMaker
 from .model import Pay, User, Config, Msg
 from app.schemas import Epusdt
 from typing import Optional, List, Sequence, Union, Tuple
+from app.utils.custom_log import logger
 
 # sqlalchemy type
 from sqlalchemy import (
@@ -44,12 +45,16 @@ class ConfigCurd(object):
 
     @staticmethod
     async def getConfig(session: AsyncSession) -> Config:
-        result = await session.execute(select(Config))
+        result = await session.execute(select(Config).where(Config.id == 1))
         return result.scalar_one()
 
     @staticmethod
     async def updateConfig(session: AsyncSession, config: Config) -> Config:
-        await session.execute(update(Config).values(**config.columns_to_dict()))
+        await session.execute(
+            update(Config)
+            .where(Config.id == 1)
+            .values(**config.columns_to_dict())
+        )
         await session.commit()
         await session.refresh(config)
         return config
@@ -89,22 +94,27 @@ class UserCurd(object):
     @staticmethod
     async def getUserCount(
         session: AsyncSession, user_id: Union[str, int]
-    ) -> Optional[int]:
+    ) -> int:
         user = await UserCurd.getUserByID(session, user_id=user_id)
         if user:
             return user.count
+        return 0
 
     @staticmethod
     async def setUserAmount(
         session: AsyncSession, user_id: Union[str, int], value: float
     ) -> Optional[User]:
         origin_amount = await UserCurd.getUserAmount(session, user_id=user_id)
-        if origin_amount:
+        if origin_amount or origin_amount == 0:
+            logger.success(
+                f"扣除金额中 {origin_amount} {value} {origin_amount + value}"
+            )
             await session.execute(
                 update(User)
                 .where(User.user_id == user_id)
                 .values(amount=origin_amount + value)
             )
+            await session.commit()
             return await UserCurd.getUserByID(session, user_id=user_id)
 
         return None
@@ -115,15 +125,30 @@ class UserCurd(object):
     ) -> Optional[User]:
         """发布次数 +1"""
         origin_count = await UserCurd.getUserCount(session, user_id=user_id)
-        if origin_count:
+        if origin_count or origin_count == 0:
             await session.execute(
                 update(User)
                 .where(User.user_id == user_id)
                 .values(count=origin_count + 1)
             )
+            await session.commit()
             return await UserCurd.getUserByID(session, user_id=user_id)
 
         return None
+
+    @staticmethod
+    async def pay(session: AsyncSession, user: User) -> User:
+        """增加一次次数并扣除对应的金额,返回用户对象"""
+        config = await ConfigCurd.getConfig(session)
+        await UserCurd.setUserAmount(
+            session, user_id=user.user_id, value=-config.once_cost
+        )
+        await UserCurd.addUserCount(session, user_id=user.user_id)
+
+        await session.commit()
+        await session.refresh(user)
+
+        return user
 
 
 class PayCurd(object):
@@ -158,6 +183,7 @@ class PayCurd(object):
                 .where(Pay.id == pay.id)
                 .values(**epusdt.model_dump())
             )
+            await session.commit()
             await session.refresh(pay)
             user = await UserCurd.setUserAmount(
                 session, user_id=pay.user_id, value=pay.amount
@@ -165,3 +191,14 @@ class PayCurd(object):
             return (pay, user)
 
         return None
+
+
+class MsgCURD(object):
+    """针对 msgs 表的 curd"""
+
+    @staticmethod
+    async def addMsg(session: AsyncSession, msg: Msg):
+        session.add(msg)
+        await session.commit()
+        await session.refresh(msg)
+        return msg

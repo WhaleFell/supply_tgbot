@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     DATABASE_URI: str = (
         "mysql+aiomysql://root:123456@localhost/tgsupply?charset=utf8mb4"
     )
-    DATABASE_ECHO: bool = False  # 是否打印数据库日志 (可看到创建表、表数据增删改查的信息)
+    DATABASE_ECHO: bool = True  # 是否打印数据库日志 (可看到创建表、表数据增删改查的信息)
 
     # logger config
     LOGGER_SAVE: bool = False
