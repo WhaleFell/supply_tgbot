@@ -182,6 +182,16 @@ class Config(Base):
         default="TTV9EnFgcZ8WXvE3YPqwz4VYoQzzLLLLLL",
     )
 
+    ban_words: Mapped[str] = mapped_column(
+        String(1000),
+        comment="由逗号分隔的违禁词列表",
+        default="做爱,死,数学,地理,生物,幼女,黄颖宝,蔡徐坤,陈立农,鸡巴",
+    )
+
+    @property
+    def banWordList(self) -> List[str]:
+        return self.ban_words.split(",")
+
     def replaceConfig(self, custom: CustomParam) -> "Config":
         return Config(
             id=self.id,

@@ -5,6 +5,7 @@
 
 from .connect import async_engine
 from .model import Base, User, Config
+from .curd import ConfigCurd
 from .connect import AsyncSessionMaker
 from app.utils.custom_log import logger
 
@@ -18,8 +19,10 @@ async def init_table(is_drop: bool = True):
             await conn.run_sync(Base.metadata.create_all)
 
         async with AsyncSessionMaker() as session:
-            session.add(Config())
-            await session.commit()
+            try:
+                await ConfigCurd.getConfig(session)
+            except:
+                await ConfigCurd.resetConfig(session)
 
         logger.info("创建表成功!!!")
     except Exception as e:

@@ -33,7 +33,7 @@ epsdk = EpusdtSDK(
 import pyromod
 from pyromod.helpers import ikb, array_chunk  # inlinekeyboard
 from pykeyboard import InlineButton, InlineKeyboard
-from pyrogram import Client, idle, filters
+from pyrogram import Client, idle, filters  # type:ignore
 from pyrogram.types import (
     Message,
     InlineKeyboardMarkup,
@@ -349,11 +349,20 @@ async def choose_privide_or_require(client: Client, message: Message):
 @capture_err
 async def send_channel_message(client: Client, message: Message):
     raw_text = remove_first_line(message.text)
+    # ban word check
+    async with AsyncSessionMaker() as session:
+        config: Config = await ConfigCurd.getConfig(session)
+        matches = [
+            ban_word for ban_word in config.banWordList if ban_word in raw_text
+        ]
+        if matches:
+            return await message.reply(text=f"您发布的需求中含有违禁词！{matches} 请检查后重新发送！")
+
     msg: Message = await message.reply(
         text=f"您的供给需求信息,是否确定发送,发送成功后将扣除 {await content.onceCost()} Cion:\n<code>{raw_text}</code>",
         reply_markup=content.confirmButton(),
     )
-    cq: CallbackQuery = await cd.moniterCallback(msg, timeout=20)
+    cq: CallbackQuery = await cd.moniterCallback(msg, timeout=30)
 
     if cq.data == CallBackData.YES:
         async with AsyncSessionMaker() as session:
@@ -402,6 +411,7 @@ def str_to_float(s: str) -> Optional[float]:
 )
 @capture_err
 async def pay_usdt(client: Client, message: Message):
+    # TODO: support amount button
     msg: Optional[Message] = await askQuestion(
         queston="请输入你要充值的金额,必须是一个小数或者整数!",
         client=client,

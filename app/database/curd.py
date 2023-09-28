@@ -24,19 +24,6 @@ from sqlalchemy import (
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# generate AsyncSession in function
-
-# async def getUserByID(user_id: int) -> Optional[User]:
-#     async with AsyncSessionMaker() as session:
-#         result = await session.get(User, ident=user_id)
-#         return result
-# async def registerUser(user: User) -> User:
-#     async with AsyncSessionMaker() as session:
-#         pass
-
-
-# async def getUserByID(session: AsyncSession, user_id: int) -> Optional[User]:
-
 
 # 1. 机器人请求支付 将返回的 trade_id 和 user_id 入库
 # 2. 支付成功后,接收回调,根据 trade_id 更新状态
@@ -202,6 +189,7 @@ class PayCurd(object):
         """更新订单状态并操作用户的余额"""
         pay = await PayCurd.findPayByTradeID(session, trade_id=epusdt.trade_id)
         if pay:
+            # 根据后端的返回更新字段
             await session.execute(
                 update(Pay)
                 .where(Pay.id == pay.id)
