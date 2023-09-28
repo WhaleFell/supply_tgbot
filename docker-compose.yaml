@@ -59,7 +59,7 @@ services:
       - TZ=Asia/Shanghai
       - DATABASE_URI=mysql+aiomysql://root:lovehyy@db/tgsupply?charset=utf8mb4
       - EPUSDT_CALLBACK_URL=http://supply_fastapi:8100/pay/callback
-      - EPUSDT_BACKEND=http://epusdt:8000/
+      - EPUSDT_BACKEND=http://epusdt:8000
       - EPUSDT_KEY=lovehyy9420
     restart: always
     volumes:
