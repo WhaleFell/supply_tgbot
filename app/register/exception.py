@@ -91,7 +91,7 @@ def register_exception(app: FastAPI):
         logger.error(
             f"SQL ERROR:{exc} URL:{request.url} Request Parameter:{params}"
         )
-
+        logger.exception("-------------------------------")
         return response_body(
             request=request,
             content=BaseResp(code=500, msg=f"SQL ERROR:{exc}").model_dump(),

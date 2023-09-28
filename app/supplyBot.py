@@ -12,11 +12,20 @@ from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime
 
 from app.database.model import User, Config, Pay, Msg
-from app.database.curd import UserCurd, ConfigCurd, MsgCURD
+from app.database.curd import UserCurd, ConfigCurd, MsgCURD, PayCurd
 
 from app.database.connect import AsyncSessionMaker
 from app.database.string_template import CustomParam
 from app.database import init_table
+
+from app.req_epusdt import EpusdtSDK
+from app.config import settings
+
+epsdk = EpusdtSDK(
+    base_url=settings.EPUSDT_BACKEND,
+    callback_url=settings.EPUSDT_CALLBACK_URL,
+    sign_key=settings.EPUSDT_KEY,
+)
 
 # ====== sqlalchemy end =====
 
@@ -193,6 +202,22 @@ class Content(object):
 发布次数:{self.addCode(user.count)}
 """
 
+    def PAY_INFO(self, pay: Pay, actual_amount: str, token: str):
+        return f"""
+支付已经创建,请在 10 分钟内向:
+<code>{token}</code>
+转账 **{actual_amount}** USDT
+
+订单号: <code>{pay.trade_id}</code>
+实际到账金额: <code>{pay.amount}</code>
+创建时间: <code>{pay.pay_at}</code>
+订单状态: <code>{pay.status}</code> (1:等待支付 2:支付成功 3:已过期)
+订单数据库 ID: <code>{pay.id}</code>
+支付用户 ID: <code>{pay.user_id}</code>
+
+**注意:转账一分都不能少,小数点也要精准支付,不然无法支付成功,遇到支付异常的情况请联系频道主**
+"""
+
     async def start(self) -> str:
         """bot description"""
         async with AsyncSessionMaker() as session:
@@ -244,7 +269,7 @@ content = Content()
 
 async def askQuestion(
     queston: str, client: Client, message: Message, timeout: int = 200
-) -> Union[Message, bool]:
+) -> Optional[Message]:
     try:
         ans: Message = await message.chat.ask(queston, timeout=timeout)  # type: ignore
         return ans
@@ -252,7 +277,8 @@ async def askQuestion(
         await message.reply(f"超时 {timeout}s,请重新 /start 开始")
     except Exception as exc:
         await message.reply(f"发送错误:\n <code>{exc}</code>")
-    return False
+
+    return None
 
 
 def try_int(string: str) -> Union[str, int]:
@@ -363,12 +389,47 @@ async def send_channel_message(client: Client, message: Message):
             )
 
 
+def str_to_float(s: str) -> Optional[float]:
+    try:
+        f = float(s)
+        return f
+    except ValueError:
+        return None
+
+
 @app.on_message(
     filters=filters.regex(content.WYCZ) & filters.private & ~filters.me
 )
 @capture_err
 async def pay_usdt(client: Client, message: Message):
-    await message.reply_text("usdt 充值")
+    msg: Optional[Message] = await askQuestion(
+        queston="请输入你要充值的金额,必须是一个小数或者整数!",
+        client=client,
+        message=message,
+        timeout=200,
+    )
+    if not msg:
+        return
+
+    amount = str_to_float(msg.text)
+    if amount == None:
+        await message.reply(f"输入的参数有错误!{msg.text}")
+        return
+
+    trade_id, actual_amount, token = await epsdk.createPay(amount=amount)
+    async with AsyncSessionMaker() as session:
+        pay = Pay(
+            user_id=message.from_user.id,
+            trade_id=trade_id,
+            amount=amount,
+        )
+        rePay = await PayCurd.createNewPay(session, pay=pay)
+
+    await message.reply(
+        text=content.PAY_INFO(
+            pay=rePay, actual_amount=actual_amount, token=token
+        )
+    )
 
 
 @app.on_message(

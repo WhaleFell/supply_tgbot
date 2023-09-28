@@ -1,7 +1,7 @@
 import httpx
 import hashlib
 import urllib.parse
-from typing import Dict
+from typing import Dict, Tuple, Union
 import asyncio
 from datetime import datetime
 
@@ -34,13 +34,26 @@ class EpusdtSDK(object):
         sign = hashlib.md5(f"{sign}{signKey}".encode()).hexdigest()
         return sign
 
-    async def createPay(self, amount: float) -> str:
+    def handleAmount(self, amount: Union[str, float, int]) -> Union[int, float]:
+        try:
+            return int(amount)
+        except:
+            pass
+
+        try:
+            return float("%.2f" % amount)
+        except:
+            pass
+
+        raise EpusdtException(f"{amount} 格式化错误!")
+
+    async def createPay(self, amount: float) -> Tuple[str, str, str]:
         """
-        请求 EPusdt API 新建一个交易,返回交易的 trade_id:str
+        请求 EPusdt API 新建一个交易,返回交易的 trade_id:str actual_amount:str 实际交易的金额 token:str 交易的 token
         """
         data: dict = {
             "order_id": datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3],
-            "amount": amount,
+            "amount": self.handleAmount(amount),
             "notify_url": self.callback_url,
             "redirect_url": "",
         }
@@ -52,11 +65,14 @@ class EpusdtSDK(object):
                 json=data,
             )
             jdata = result.json()
-            print(jdata)
             if jdata["status_code"] == 200:
-                return jdata["data"]["trade_id"]
+                return (
+                    jdata["data"]["trade_id"],
+                    jdata["data"]["actual_amount"],
+                    jdata["data"]["token"],
+                )
 
-            raise EpusdtException(jdata["message"])
+            raise EpusdtException(f"{data} Response: {result.text}")
 
 
 async def main():

@@ -7,3 +7,4 @@
 
 from .base import BaseResp
 from .epusdt import Epusdt
+from .configModel import Config

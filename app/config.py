@@ -19,7 +19,10 @@ class Settings(BaseSettings):
     PROJECT_DESC: str = "🎉 接口汇总 🎉"  # 描述
     PROJECT_VERSION: str = "1.0"  # 版本
 
-    EPUSDT_BACKEND: str = "http://192.168.8.1:8966/"
+    # 末尾不能有 /
+    EPUSDT_BACKEND: str = "http://192.168.8.1:8966"
+    EPUSDT_CALLBACK_URL: str = "http://192.168.8.219:8000/pay/callback"
+    EPUSDT_KEY: str = "lovehyy9420"
 
     # 跨域请求(务必指定精确ip, 不要用localhost)
     CORS_ORIGINS: Union[List[AnyHttpUrl], List[str]] = ["*"]
@@ -31,7 +34,7 @@ class Settings(BaseSettings):
     DATABASE_URI: str = (
         "mysql+aiomysql://root:123456@localhost/tgsupply?charset=utf8mb4"
     )
-    DATABASE_ECHO: bool = True  # 是否打印数据库日志 (可看到创建表、表数据增删改查的信息)
+    DATABASE_ECHO: bool = False  # 是否打印数据库日志 (可看到创建表、表数据增删改查的信息)
 
     # logger config
     LOGGER_SAVE: bool = False

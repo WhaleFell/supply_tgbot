@@ -18,6 +18,8 @@ from sqlalchemy import (
     update,
     String,
     DateTime,
+    text,
+    delete,
 )
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -56,8 +58,30 @@ class ConfigCurd(object):
             .values(**config.columns_to_dict())
         )
         await session.commit()
-        await session.refresh(config)
-        return config
+
+        return await ConfigCurd.getConfig(session)
+
+    @staticmethod
+    async def resetConfig(session: AsyncSession) -> Config:
+        """重置参数"""
+        await session.execute(delete(Config))
+        default_config = Config(id=1)
+        session.add(default_config)
+        await session.commit()
+        await session.refresh(default_config)
+        return default_config
+
+    @staticmethod
+    async def setUSDTToken(session: AsyncSession):
+        """去到 epusdt 的数据库修改钱包地址"""
+        config: Config = await ConfigCurd.getConfig(session)
+
+        await session.execute(
+            text(
+                f"UPDATE `epusdt`.`wallet_address` SET `token` = '{config.usdt_token}' WHERE `id` = 1"
+            )
+        )
+        await session.commit()
 
 
 class UserCurd(object):
@@ -107,7 +131,7 @@ class UserCurd(object):
         origin_amount = await UserCurd.getUserAmount(session, user_id=user_id)
         if origin_amount or origin_amount == 0:
             logger.success(
-                f"扣除金额中 {origin_amount} {value} {origin_amount + value}"
+                f"操作金额中: Origin:{origin_amount} Value:{value} Result:{origin_amount + value}"
             )
             await session.execute(
                 update(User)
@@ -174,23 +198,41 @@ class PayCurd(object):
     @staticmethod
     async def updatePayStatus(
         session: AsyncSession, epusdt: Epusdt
-    ) -> Optional[Tuple[Pay, Optional[User]]]:
+    ) -> Tuple[Pay, User]:
         """更新订单状态并操作用户的余额"""
         pay = await PayCurd.findPayByTradeID(session, trade_id=epusdt.trade_id)
         if pay:
             await session.execute(
                 update(Pay)
                 .where(Pay.id == pay.id)
-                .values(**epusdt.model_dump())
+                .values(
+                    **epusdt.model_dump(
+                        exclude={
+                            "block_transaction_id",
+                            "token",
+                            "order_id",
+                            "actual_amount",
+                            "signature",
+                        }
+                    )
+                )
             )
             await session.commit()
             await session.refresh(pay)
             user = await UserCurd.setUserAmount(
                 session, user_id=pay.user_id, value=pay.amount
             )
-            return (pay, user)
+            return (pay, user)  # type: ignore
 
-        return None
+        return None  # type: ignore
+
+    @staticmethod
+    async def getAllPay(
+        session: AsyncSession,
+    ) -> Union[List[Pay], Sequence[Pay]]:
+        """获取所有的支付记录"""
+        result = await session.scalars(select(Pay))
+        return result.all()
 
 
 class MsgCURD(object):

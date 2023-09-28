@@ -176,6 +176,12 @@ class Config(Base):
         default="-1001858197255",
     )
 
+    usdt_token: Mapped[str] = mapped_column(
+        String(100),
+        comment="收款USDT地址",
+        default="TTV9EnFgcZ8WXvE3YPqwz4VYoQzzLLLLLL",
+    )
+
     def replaceConfig(self, custom: CustomParam) -> "Config":
         return Config(
             id=self.id,
