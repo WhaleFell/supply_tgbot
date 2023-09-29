@@ -107,7 +107,7 @@ class User(Base):
         nullable=False,
         # server_default=func.now(),
         # default=getBeijingTime(),
-        default_factory=getBeijingTime,
+        default=getBeijingTime,
         comment="注册时间",
     )
 
@@ -244,7 +244,7 @@ class Msg(Base):
     send_at: Mapped[datetime] = mapped_column(
         nullable=False,
         # server_default=func.now(),
-        default_factory=getBeijingTime,
+        default=getBeijingTime,
         comment="注册时间",
     )
 
@@ -271,7 +271,7 @@ class Pay(Base):
         nullable=False,
         # server_default=func.now(),
         # default=getBeijingTime(),
-        default_factory=getBeijingTime,
+        default=getBeijingTime,
         # onupdate=func.now(),
         onupdate=getBeijingTime,
         comment="交易时间 自动生成自动更新",
