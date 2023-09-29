@@ -29,5 +29,5 @@ class Config(BaseModel):
     usdt_token: str = Field(title="收款的 USDT 地址", default=None)
     description: str = Field(title="机器人描述", default=None)
     once_cost: float = Field(title="单价", default=None)
-
+    ban_words: str = Field(title="屏蔽词,使用 , 分隔", default=None)
     model_config = ConfigDict(from_attributes=True)
