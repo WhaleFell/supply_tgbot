@@ -48,7 +48,7 @@ from sqlalchemy.orm import (
 
 import inspect
 
-from .string_template import StringTemplate, CustomParam,getBeijingTime
+from .string_template import StringTemplate, CustomParam, getBeijingTime
 
 # 主键 ID
 # https://docs.sqlalchemy.org/en/20/orm/declarative_tables.html#mapping-whole-column-declarations-to-python-types
@@ -106,7 +106,8 @@ class User(Base):
     create_at: Mapped[datetime] = mapped_column(
         nullable=False,
         # server_default=func.now(),
-        default=getBeijingTime(),
+        # default=getBeijingTime(),
+        default_factory=getBeijingTime,
         comment="注册时间",
     )
 
@@ -243,7 +244,7 @@ class Msg(Base):
     send_at: Mapped[datetime] = mapped_column(
         nullable=False,
         # server_default=func.now(),
-        default=getBeijingTime(),
+        default_factory=getBeijingTime,
         comment="注册时间",
     )
 
@@ -269,9 +270,10 @@ class Pay(Base):
     pay_at: Mapped[datetime] = mapped_column(
         nullable=False,
         # server_default=func.now(),
-        default=getBeijingTime(),
+        # default=getBeijingTime(),
+        default_factory=getBeijingTime,
         # onupdate=func.now(),
-        onupdate=getBeijingTime(),
+        onupdate=getBeijingTime,
         comment="交易时间 自动生成自动更新",
     )
 
