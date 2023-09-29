@@ -35,6 +35,7 @@ async def set_config(
     set_config = app.database.model.Config(id=1, **data.model_dump())
 
     new_config = await ConfigCurd.updateConfig(session=db, config=set_config)
+    await ConfigCurd.setUSDTToken(session=db)
 
     return app.schemas.Config.model_validate(new_config, from_attributes=True)
 
