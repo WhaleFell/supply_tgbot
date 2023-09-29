@@ -205,6 +205,8 @@ class Config(Base):
             admin_password=self.admin_password,
             description=self.description.replace(
                 "【每次消耗的USDT】", str(self.once_cost)
+            ).replace(
+                "【当前时间】", custom.currentTime.strftime(r"%Y-%m-%d %H:%M:%S")
             ),
             provide_desc=self.provide_desc,
             require_desc=self.require_desc,
