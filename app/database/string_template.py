@@ -16,11 +16,21 @@ from typing import Optional
 # 【当前时间】
 # 【用户内容】
 
+from datetime import datetime, timedelta
+
+
+def getBeijingTime() -> datetime:
+    """获取北京时间"""
+    utc_now = datetime.utcnow()  # 获取当前UTC时间
+    beijing_offset = timedelta(hours=8)  # 北京时间比UTC时间早8小时
+    beijing_now = utc_now + beijing_offset  # 将偏移量加到当前时间上
+    return beijing_now
+
 
 class CustomParam(BaseModel):
     costAmount: Optional[int] = None
     count: Optional[int] = None
-    currentTime: datetime = Field(default_factory=datetime.now)
+    currentTime: datetime = Field(default_factory=getBeijingTime)
     sendCountent: Optional[str] = None
 
 
