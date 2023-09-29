@@ -4,7 +4,7 @@
 # user router 路由
 
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, status, Body
 from fastapi.responses import ORJSONResponse, PlainTextResponse
 from fastapi.encoders import jsonable_encoder
 
@@ -43,14 +43,6 @@ async def get_user(
         session=db, user_id=user_id
     )
     if user:
-        result = await db.scalar(
-            select(app.database.User).where(
-                app.database.User.user_id == user_id
-            )
-        )
-        if result:
-            print(result.msgs)
-
         return ORJSONResponse(content=jsonable_encoder(user))
 
     return ORJSONResponse(
@@ -66,3 +58,20 @@ async def get_user_total_amount(
     total: float = result.scalar()  # type: ignore
 
     return PlainTextResponse(content=str(round(total, 2)))
+
+
+@router.post("/set_user_amount/", description="设置用户余额")
+async def set_user_amount(
+    user_id: Annotated[str, Body(title="用户 ID")],
+    amount: Annotated[float, Body(title="用户 ID")],
+    db: Annotated[AsyncSession, Depends(get_session)],
+) -> ORJSONResponse:
+    user = await UserCurd.setUserAmount(
+        session=db, user_id=user_id, value=amount
+    )
+    if user:
+        return ORJSONResponse(content=jsonable_encoder(user))
+
+    return ORJSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND, content=jsonable_encoder([])
+    )

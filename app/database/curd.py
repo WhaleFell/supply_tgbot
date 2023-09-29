@@ -115,18 +115,34 @@ class UserCurd(object):
     async def setUserAmount(
         session: AsyncSession, user_id: Union[str, int], value: float
     ) -> Optional[User]:
-        origin_amount = await UserCurd.getUserAmount(session, user_id=user_id)
-        if origin_amount or origin_amount == 0:
-            logger.success(
-                f"操作金额中: Origin:{origin_amount} Value:{value} Result:{origin_amount + value}"
-            )
+        """重新设置用户金额"""
+        user = await UserCurd.getUserByID(session, user_id=user_id)
+        if not user == None:
+            logger.info(f"Set user:{user_id} amount: {value}")
             await session.execute(
-                update(User)
-                .where(User.user_id == user_id)
-                .values(amount=origin_amount + value)
+                update(User).where(User.user_id == user_id).values(amount=value)
             )
             await session.commit()
             return await UserCurd.getUserByID(session, user_id=user_id)
+
+        return None
+
+    @staticmethod
+    async def increaseUserAmount(
+        session: AsyncSession, user_id: Union[str, int], value: float
+    ) -> Optional[User]:
+        """传入改变的金额,增加/减少用户金额"""
+        origin_amount = await UserCurd.getUserAmount(session, user_id=user_id)
+        if not origin_amount == None:
+            logger.info(
+                f"操作金额中: Origin:{origin_amount} Value:{value} Result:{origin_amount + value}"
+            )
+            end_user = await UserCurd.setUserAmount(
+                session, user_id=user_id, value=origin_amount + value
+            )
+
+            await session.commit()
+            return end_user
 
         return None
 
@@ -136,7 +152,7 @@ class UserCurd(object):
     ) -> Optional[User]:
         """发布次数 +1"""
         origin_count = await UserCurd.getUserCount(session, user_id=user_id)
-        if origin_count or origin_count == 0:
+        if not origin_count == None:
             await session.execute(
                 update(User)
                 .where(User.user_id == user_id)
@@ -151,7 +167,7 @@ class UserCurd(object):
     async def pay(session: AsyncSession, user: User) -> User:
         """增加一次次数并扣除对应的金额,返回用户对象"""
         config = await ConfigCurd.getConfig(session)
-        await UserCurd.setUserAmount(
+        await UserCurd.increaseUserAmount(
             session, user_id=user.user_id, value=-config.once_cost
         )
         await UserCurd.addUserCount(session, user_id=user.user_id)
@@ -215,7 +231,7 @@ class PayCurd(object):
             )
             await session.commit()
             await session.refresh(pay)
-            user = await UserCurd.setUserAmount(
+            user = await UserCurd.increaseUserAmount(
                 session, user_id=pay.user_id, value=pay.amount
             )
             return (pay, user)  # type: ignore
