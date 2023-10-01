@@ -231,13 +231,13 @@ class Content(object):
         """供应方"""
         async with AsyncSessionMaker() as session:
             config: Config = await ConfigCurd.getConfig(session)
-            return config.provide_desc
+            return "\n" + config.provide_desc
 
     async def REQUIRE(self) -> str:
         """需求方"""
         async with AsyncSessionMaker() as session:
             config: Config = await ConfigCurd.getConfig(session)
-            return config.require_desc
+            return "\n" + config.require_desc
 
     async def onceCost(self) -> float:
         async with AsyncSessionMaker() as session:
