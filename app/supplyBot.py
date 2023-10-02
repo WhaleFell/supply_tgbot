@@ -200,6 +200,7 @@ class Content(object):
         keyboard = ReplyKeyboardMarkup(
             [[self.ZZFB, self.WYCZ], [self.GRZX, self.FBJL]],
             resize_keyboard=True,
+            is_persistent=True,
         )
         return keyboard
 
