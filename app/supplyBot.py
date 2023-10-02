@@ -453,11 +453,13 @@ async def handle_reply_message(client: Client, message: Message):
     """处理回复的供需信息,并进行发布"""
     # first check
     privideKws = ["名称", "介绍", "联系人", "价格"]
-    requireKws = ["需求", "联系人", "名称"]
+    requireKws = ["需求", "联系人", "预算"]
     if not contains_all_keywords(
         message.text, privideKws
     ) or contains_all_keywords(message.text, requireKws):
-        return message.reply(f"请严格按照格式发布!")
+        return await message.reply(
+            f"请严格按照格式发布!\n供给包含:{privideKws}\n需求包含:{requireKws}"
+        )
 
     # ban word check
     async with AsyncSessionMaker() as session:
