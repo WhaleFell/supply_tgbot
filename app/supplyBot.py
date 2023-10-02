@@ -100,15 +100,21 @@ def capture_err(func):
         except asyncio.exceptions.TimeoutError:
             logger.error("回答超时！")
             if isinstance(message, Message):
-                await message.reply(f"回答超时,请重来！")
+                await message.reply(
+                    f"回答超时,请重来！", reply_markup=content.KEYBOARD()
+                )
         except SQLAlchemyError as err:
             logger.error(f"SQL Error:{err}")
             if isinstance(message, CallbackQuery):
                 await message.message.reply(
-                    f"机器人按钮回调数据库 Panic 了请重试:\n<code>{err}</code>"
+                    f"机器人按钮回调数据库 Panic 了请重试:\n<code>{err}</code>",
+                    reply_markup=content.KEYBOARD(),
                 )
             else:
-                await message.reply(f"机器人数据库 Panic 了请重试:\n<code>{err}</code>")
+                await message.reply(
+                    f"机器人数据库 Panic 了请重试:\n<code>{err}</code>",
+                    reply_markup=content.KEYBOARD(),
+                )
             raise err
         except pyroExc.bad_request_400.MessageNotModified as exc:
             logger.error(
@@ -118,10 +124,14 @@ def capture_err(func):
             logger.error(f"TGBot Globe Error:{err}")
             if isinstance(message, CallbackQuery):
                 await message.message.reply(
-                    f"机器人按钮回调 Panic 了:\n<code>{err}</code>"
+                    f"机器人按钮回调 Panic 了:\n<code>{err}</code>",
+                    reply_markup=content.KEYBOARD(),
                 )
             else:
-                await message.reply(f"机器人 Panic 了:\n<code>{err}</code>")
+                await message.reply(
+                    f"机器人 Panic 了:\n<code>{err}</code>",
+                    reply_markup=content.KEYBOARD(),
+                )
             raise err
 
     return capture
@@ -472,7 +482,10 @@ async def handle_reply_message(client: Client, message: Message):
             if ban_word in message.text
         ]
         if matches:
-            return await message.reply(text=f"您发布的需求中含有违禁词！{matches} 请检查后重新发送！")
+            return await message.reply(
+                text=f"您发布的需求中含有违禁词！{matches} 请检查后重新发送！",
+                reply_markup=content.KEYBOARD(),
+            )
 
     msg: Message = await message.reply(
         text=f"您的供给需求信息,是否确定发送,发送成功后将扣除 {await content.onceCost()} 余额:\n<code>{message.text}</code>",
@@ -487,7 +500,9 @@ async def handle_reply_message(client: Client, message: Message):
             )
 
             if user.amount <= 0:
-                await message.reply("💔💔💔对不起,你的没钱了,赶紧充值！！！")
+                await message.reply(
+                    "💔💔💔对不起,你的没钱了,赶紧充值！！！", reply_markup=content.KEYBOARD()
+                )
                 return
 
             config: Config = await ConfigCurd.getConfig(session)
@@ -528,7 +543,7 @@ async def handle_reply_message(client: Client, message: Message):
 
             await session.commit()
             await msg.edit_text(
-                text=f"供需发送频道成功,您的信息:\n{content.USER_INFO(user_end)} \n发送时间:{store_send_msg.send_at}\n扣除余额:{store_send_msg.amount}\n频道链接:{store_send_msg.url}"
+                text=f"供需发送频道成功,您的信息:\n{content.USER_INFO(user_end)} \n发送时间:{store_send_msg.send_at}\n扣除余额:{store_send_msg.amount}\n频道链接:{store_send_msg.url}",
             )
 
 
@@ -553,7 +568,9 @@ async def account_info(client: Client, message: Message):
     async with AsyncSessionMaker() as session:
         user = await UserCurd.getUserByID(session, user_id=message.from_user.id)
         if not user:
-            await message.reply_text("用户未注册!正在注册!")
+            await message.reply_text(
+                "用户未注册!正在注册!", reply_markup=content.KEYBOARD()
+            )
             user = await UserCurd.registerUser(
                 session, user=User.generateUser(message)
             )
@@ -562,7 +579,10 @@ async def account_info(client: Client, message: Message):
         pay_string_list = user.getUserPays()
         string = "\n".join(pay_string_list)
 
-        await message.reply_text(f"{content.USER_INFO(user)}\n支付记录:\n{string}")
+        await message.reply_text(
+            f"{content.USER_INFO(user)}\n支付记录:\n{string}",
+            reply_markup=content.KEYBOARD(),
+        )
 
 
 @app.on_message(
@@ -574,7 +594,9 @@ async def send_msg_info(client: Client, message: Message):
     async with AsyncSessionMaker() as session:
         user = await UserCurd.getUserByID(session, user_id=message.from_user.id)
         if not user:
-            await message.reply_text("用户未注册!正在注册!")
+            await message.reply_text(
+                "用户未注册!正在注册!", reply_markup=content.KEYBOARD()
+            )
             user = await UserCurd.registerUser(
                 session, user=User.generateUser(message)
             )
@@ -583,13 +605,18 @@ async def send_msg_info(client: Client, message: Message):
         msg_string_list = user.getUserMsg()
         string = "\n".join(msg_string_list)
 
-        await message.reply_text(f"❤您的发布记录如下❤\n{string}")
+        await message.reply_text(
+            f"❤您的发布记录如下❤\n{string}", reply_markup=content.KEYBOARD()
+        )
 
 
 @app.on_message(filters=filters.command("getID") & ~filters.me)
 @capture_err
 async def get_ID(client: Client, message: Message):
-    await message.reply(f"当前会话的ID:<code>{message.chat.id}</code>")
+    await message.reply(
+        f"当前会话的ID:<code>{message.chat.id}</code>",
+        reply_markup=content.KEYBOARD(),
+    )
 
 
 # ==== Handle end =====
@@ -625,6 +652,7 @@ async def checkPayStatus(session: AsyncSession, client: Client):
             await client.send_message(
                 chat_id=int(noticePay.user_id),
                 text=f"订单号:<code>{noticePay.trade_id}</code>\n时间:{noticePay.pay_at}\n请求支付{noticePay.amount}USDT 已经支付成功!👩阿里嘎多！👩",
+                reply_markup=content.KEYBOARD(),
             )
             continue
         timeout = isTimeout(datetime_obj=unNoticePay.pay_at)
@@ -639,6 +667,7 @@ async def checkPayStatus(session: AsyncSession, client: Client):
             await client.send_message(
                 chat_id=int(noticePay.user_id),
                 text=f"订单号:<code>{noticePay.trade_id}</code>\n时间:{noticePay.pay_at}\n请求支付{noticePay.amount} USDT\n**已经超时!请重新发起支付!**",
+                reply_markup=content.KEYBOARD(),
             )
 
 
