@@ -454,9 +454,10 @@ async def handle_reply_message(client: Client, message: Message):
     # first check
     privideKws = ["名称", "介绍", "联系人", "价格"]
     requireKws = ["需求", "联系人", "预算"]
-    if not contains_all_keywords(
-        message.text, privideKws
-    ) or contains_all_keywords(message.text, requireKws):
+    if not (
+        contains_all_keywords(message.text, privideKws)
+        or contains_all_keywords(message.text, requireKws)
+    ):
         return await message.reply(
             f"请严格按照格式发布!\n供给包含:{privideKws}\n需求包含:{requireKws}"
         )
