@@ -177,10 +177,10 @@ class Config(Base):
     )
 
     channel_id: Mapped[str] = mapped_column(
-        String(20),
-        comment="机器人绑定的频道 ID",
+        String(1000),
+        comment="机器人需要发送的 channel ids 用逗号分隔",
         nullable=False,
-        default="-1001858197255",
+        default="-1001858197255,",
     )
 
     usdt_token: Mapped[str] = mapped_column(
@@ -195,9 +195,19 @@ class Config(Base):
         default="做爱,死,数学,地理,生物,幼女,黄颖宝,蔡徐坤,陈立农,鸡巴",
     )
 
+    multiple: Mapped[float] = mapped_column(
+        Float(precision=2), comment="充值倍率", nullable=False, default="1"
+    )
+
     @property
     def banWordList(self) -> List[str]:
+        """生成屏蔽词列表"""
         return self.ban_words.split(",")
+
+    @property
+    def sendChannelID(self) -> List[int]:
+        """生成需要发送的频道列表"""
+        return [int(id_) for id_ in self.ban_words.split(",")]
 
     def replaceConfig(self, custom: CustomParam) -> "Config":
         return Config(
@@ -217,6 +227,7 @@ class Config(Base):
             .replace("【用户内容】", str(custom.sendCountent)),
             once_cost=self.once_cost,
             channel_id=self.channel_id,
+            mulitiple=self.multiple,
         )
 
     # https://stackoverflow.com/questions/1958219/how-to-convert-sqlalchemy-row-object-to-a-python-dict#34
@@ -250,6 +261,16 @@ class Msg(Base):
         comment="注册时间",
     )
 
+    # 这条信息扣除的金额
+    amount: Mapped[float] = mapped_column(
+        Float(precision=2), comment="这条信息扣除的金额", nullable=False
+    )
+
+    # 发送返回的频道 URL
+    url: Mapped[str] = mapped_column(
+        String(1000), comment="发送返回的频道 URL", nullable=True
+    )
+
 
 class Pay(Base):
     __tablename__ = "pays"
@@ -267,14 +288,15 @@ class Pay(Base):
         String(100), comment="订单号", unique=True
     )
 
-    amount: Mapped[float] = mapped_column(Float(precision=2), comment="金额")
+    # 实际支付的金额
+    amount: Mapped[float] = mapped_column(Float(precision=2), comment="实际支付的金额")
 
     pay_at: Mapped[datetime] = mapped_column(
         nullable=False,
         # server_default=func.now(),
         # default=getBeijingTime(),
-        default=getBeijingTime,
         # onupdate=func.now(),
+        default=getBeijingTime,
         onupdate=getBeijingTime,
         comment="交易时间 自动生成自动更新",
     )

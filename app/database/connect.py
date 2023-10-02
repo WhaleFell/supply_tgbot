@@ -4,7 +4,7 @@
 # curd/connect.py
 # 数据库连接
 
-from typing import AsyncIterator  # 异步迭代器
+from typing import AsyncIterator, AsyncGenerator  # 异步迭代器 异步生成器
 from typing_extensions import Annotated
 from sqlalchemy.exc import SQLAlchemyError  # sqlalchemy error
 from app.utils.custom_log import logger
@@ -30,13 +30,14 @@ async_engine = create_async_engine(
     future=True,
 )
 
-# 在引擎初始化时指定 echo=True 将使我们能够在控制台中看到生成的 SQL 查询。我们应该使用 expire_on_commit=False 禁用会话的“提交时过期”行为。这是因为在异步设置中，我们不希望 SQLAlchemy 在访问已提交的对象时向数据库发出新的 SQL 查询。
+# 在引擎初始化时指定 echo=True 将使我们能够在控制台中看到生成的 SQL 查询。
+# expire_on_commit=False 禁用会话的“提交时过期”行为。这是因为在异步设置中，我们不希望 SQLAlchemy 在访问已提交的对象时向数据库发出新的 SQL 查询。
 AsyncSessionMaker: async_sessionmaker[AsyncSession] = async_sessionmaker(
     async_engine, expire_on_commit=False
 )
 
 
 # FastAPI Dependent
-async def get_session() -> AsyncSession:
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionMaker() as session:
-        yield session  # type: ignore
+        yield session
