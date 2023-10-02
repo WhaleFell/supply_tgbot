@@ -506,6 +506,7 @@ async def handle_reply_message(client: Client, message: Message):
                     chat_id=channel_id,
                     text=send_content_review,
                     reply_markup=content.channelButton(),
+                    disable_web_page_preview=True,
                 )
                 send_msg_links.append(send_msg.link)
 
@@ -577,9 +578,9 @@ async def send_msg_info(client: Client, message: Message):
                 session, user=User.generateUser(message)
             )
 
-        # 调出用户的充值记录
-        pay_string_list = user.getUserMsg()
-        string = "\n".join(pay_string_list)
+        # 调出用户的发布记录
+        msg_string_list = user.getUserMsg()
+        string = "\n".join(msg_string_list)
 
         await message.reply_text(f"❤您的发布记录如下❤\n{string}")
 
