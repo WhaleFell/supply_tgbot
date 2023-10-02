@@ -440,10 +440,25 @@ async def choose_privide_or_require(client: Client, message: Message):
     )
 
 
+def contains_all_keywords(string, keywords: List[str]) -> bool:
+    for keyword in keywords:
+        if keyword not in string:
+            return False
+    return True
+
+
 @app.on_message(filters=filters.reply & filters.private & ~filters.me)
 @capture_err
 async def handle_reply_message(client: Client, message: Message):
     """处理回复的供需信息,并进行发布"""
+    # first check
+    privideKws = ["名称", "介绍", "联系人", "价格"]
+    requireKws = ["需求", "联系人", "名称"]
+    if not contains_all_keywords(
+        message.text, privideKws
+    ) or contains_all_keywords(message.text, requireKws):
+        return message.reply(f"请严格按照格式发布!")
+
     # ban word check
     async with AsyncSessionMaker() as session:
         config: Config = await ConfigCurd.getConfig(session)
