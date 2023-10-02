@@ -542,8 +542,10 @@ async def handle_reply_message(client: Client, message: Message):
             )
 
             await session.commit()
-            await msg.edit_text(
+            await msg.delete()
+            await message.reply(
                 text=f"供需发送频道成功,您的信息:\n{content.USER_INFO(user_end)} \n发送时间:{store_send_msg.send_at}\n扣除余额:{store_send_msg.amount}\n频道链接:{store_send_msg.url}",
+                reply_markup=content.KEYBOARD(),
             )
 
 
