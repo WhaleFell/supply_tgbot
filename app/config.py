@@ -20,7 +20,8 @@ class Settings(BaseSettings):
     PROJECT_VERSION: str = "1.0"  # 版本
 
     # 末尾不能有 /
-    EPUSDT_BACKEND: str = "http://192.168.8.1:8966"
+    # http://usa1.whaleluo.top:8445
+    EPUSDT_BACKEND: str = "http://usa1.whaleluo.top:8445"
     EPUSDT_CALLBACK_URL: str = "http://192.168.8.219:8000/pay/callback"
     EPUSDT_KEY: str = "lovehyy9420"
 

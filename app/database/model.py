@@ -12,7 +12,7 @@
     [4]: https://docs.sqlalchemy.org/en/20/orm/declarative_config.html#other-declarative-mapping-directives
 """
 import asyncio
-from typing import List, Dict, Optional, Mapping, Type, TypeVar
+from typing import List, Dict, Optional, Mapping, Type, TypeVar, Tuple
 import typing
 from typing_extensions import Annotated
 from datetime import datetime, timedelta
@@ -28,6 +28,7 @@ from sqlalchemy import (
     DateTime,
     Integer,
     Float,
+    Boolean,
 )
 
 # sqlalchemy asynchronous support
@@ -134,6 +135,51 @@ class User(Base):
             user_id=message.from_user.id,
         )
 
+    def getUserPays(self) -> List[str]:
+        """获取用户支付记录信息"""
+
+        def generate_status(status: int) -> str:
+            if status == 1:
+                return "等待支付"
+            elif status == 2:
+                return "成功支付"
+            elif status == 3:
+                return "已经超时"
+            return "未知"
+
+        # success = [
+        #     f"支付时间:{pay.pay_at}-金额:{pay.amount}"
+        #     for pay in self.pays
+        #     if pay.status == 2
+        # ]
+
+        # failure = [
+        #     f"支付时间:{pay.pay_at}-金额:{pay.amount}-状态:{'已超时' if pay.status==3 else '等待支付'}"
+        #     for pay in self.pays
+        #     if pay.status != 2
+        # ]
+
+        all = [
+            f"支付时间:{pay.pay_at}-金额:{pay.amount}-状态:{generate_status(pay.status)}-订单号:<code>{pay.trade_id}</code>"
+            for pay in self.pays
+        ]
+
+        return all
+
+    def getUserMsg(self) -> List[str]:
+        all = [
+            f"发送时间:{msg.send_at} 扣除金额:{msg.amount} 链接:{msg.url}"
+            for msg in self.msgs
+        ]
+        return all
+
+    def getUserLink(self) -> str:
+        """获取用户链接如果不存在的返回用户ID"""
+        if self.username:
+            return f"[👉点击此处联系发布者👈](https://t.me/{self.username})"
+        else:
+            return f"发布者 ID:{self.user_id}"
+
 
 class Config(Base):
     __tablename__ = "config"
@@ -176,7 +222,7 @@ class Config(Base):
         comment="一次发送消耗的 USDT",
     )
 
-    channel_id: Mapped[str] = mapped_column(
+    channel_ids: Mapped[str] = mapped_column(
         String(1000),
         comment="机器人需要发送的 channel ids 用逗号分隔",
         nullable=False,
@@ -196,7 +242,7 @@ class Config(Base):
     )
 
     multiple: Mapped[float] = mapped_column(
-        Float(precision=2), comment="充值倍率", nullable=False, default="1"
+        Float(precision=2), comment="充值倍率", nullable=False, default=1.0
     )
 
     @property
@@ -205,11 +251,13 @@ class Config(Base):
         return self.ban_words.split(",")
 
     @property
-    def sendChannelID(self) -> List[int]:
+    def sendChannelIDs(self) -> List[int]:
         """生成需要发送的频道列表"""
-        return [int(id_) for id_ in self.ban_words.split(",")]
+        # print(self.channel_ids.split(","))
+        return [int(id_) for id_ in self.channel_ids.split(",") if id_ != ""]
 
     def replaceConfig(self, custom: CustomParam) -> "Config":
+        # TODO: need optimize the code
         return Config(
             id=self.id,
             admin_password=self.admin_password,
@@ -226,8 +274,8 @@ class Config(Base):
             )
             .replace("【用户内容】", str(custom.sendCountent)),
             once_cost=self.once_cost,
-            channel_id=self.channel_id,
-            mulitiple=self.multiple,
+            channel_ids=self.channel_ids,
+            multiple=self.multiple,
         )
 
     # https://stackoverflow.com/questions/1958219/how-to-convert-sqlalchemy-row-object-to-a-python-dict#34
@@ -268,7 +316,7 @@ class Msg(Base):
 
     # 发送返回的频道 URL
     url: Mapped[str] = mapped_column(
-        String(1000), comment="发送返回的频道 URL", nullable=True
+        String(1000), comment="发送返回的频道 URL,如果多个频道就用,链接", nullable=True
     )
 
 
@@ -303,4 +351,9 @@ class Pay(Base):
 
     status: Mapped[int] = mapped_column(
         Integer, comment="交易状态 1:等待支付 2:支付成功 3:已过期", default=1
+    )
+
+    # 该交易是否了通知用户
+    notice: Mapped[bool] = mapped_column(
+        Boolean(), default=False, comment="该交易是否通知用户"
     )

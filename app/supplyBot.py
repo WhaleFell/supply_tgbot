@@ -41,8 +41,10 @@ from pyrogram.types import (
     BotCommand,
     CallbackQuery,
     InlineKeyboardButton,
+    ForceReply,
 )
 from pyrogram.enums import ParseMode
+from pyrogram.errors import exceptions as pyroExc
 
 # ====== pyrogram end =====
 
@@ -59,6 +61,7 @@ import os
 import sys
 import glob
 from asyncio import Queue
+from datetime import datetime, timedelta
 
 # ====== Schemas ======
 
@@ -107,8 +110,12 @@ def capture_err(func):
             else:
                 await message.reply(f"机器人数据库 Panic 了请重试:\n<code>{err}</code>")
             raise err
+        except pyroExc.bad_request_400.MessageNotModified as exc:
+            logger.error(
+                f"Pyrogram MessageNotModified Error 编辑了相同信息 {exc.MESSAGE}"
+            )
         except Exception as err:
-            logger.error(f"TGBot Error:{err}")
+            logger.error(f"TGBot Globe Error:{err}")
             if isinstance(message, CallbackQuery):
                 await message.message.reply(
                     f"机器人按钮回调 Panic 了:\n<code>{err}</code>"
@@ -179,15 +186,20 @@ class CallBackData:
 
     PAY: str = "pay"
 
+    PROVIDE: str = "provide"
+    REQUIRE: str = "require"
+
 
 class Content(object):
     ZZFB = "💫自助发布"
     WYCZ = "✨我要充值"
     GRZX = "👩‍🦱个人中心"
+    FBJL = "🔰发布记录"
 
     def KEYBOARD(self) -> ReplyKeyboardMarkup:
         keyboard = ReplyKeyboardMarkup(
-            [[self.ZZFB, self.WYCZ], [self.GRZX]], resize_keyboard=True
+            [[self.ZZFB, self.WYCZ], [self.GRZX, self.FBJL]],
+            resize_keyboard=True,
         )
         return keyboard
 
@@ -195,29 +207,34 @@ class Content(object):
         return f"<code>{code}</code>"
 
     def USER_INFO(self, user: "User") -> str:
+        # 用户 ID:{self.addCode(user.user_id)}
         return f"""
 👧用户信息👧
-系统 ID: {self.addCode(user.id)}
-用户 ID:{self.addCode(user.user_id)}
 注册时间:{self.addCode(user.create_at)}
-账号余额:{self.addCode(user.amount)} Cion
+账号余额:{self.addCode(user.amount)} USDT
 发布次数:{self.addCode(user.count)}
 """
 
-    def PAY_INFO(self, pay: Pay, actual_amount: str, token: str):
+    def PAY_INFO(
+        self, pay: Pay, actual_amount: str, token: str, config: Config
+    ):
         return f"""
 支付已经创建,请在 10 分钟内向:
 <code>{token}</code>
 转账 **{actual_amount}** USDT
 
+当前系统充值倍率:<code>{config.multiple}</code>
 订单号: <code>{pay.trade_id}</code>
-实际到账金额: <code>{pay.amount}</code>
+实际到账金额: <code>{pay.amount*config.multiple}</code>
 创建时间: <code>{pay.pay_at}</code>
 订单状态: <code>{pay.status}</code> (1:等待支付 2:支付成功 3:已过期)
 订单数据库 ID: <code>{pay.id}</code>
 支付用户 ID: <code>{pay.user_id}</code>
 
-**注意:转账一分都不能少,小数点也要精准支付,不然无法支付成功,遇到支付异常的情况请联系频道主**
+⚠⚠⚠注意:
+**1. 转账一分也不能少，小数点也要准确支付才能到账，否则后果自负。**
+**2. 订单在 10 分钟内超时，过期不候！**
+**3. 遇到支付问题请带着用户ID及时联系供需频道主！**
 """
 
     async def start(self) -> str:
@@ -231,13 +248,13 @@ class Content(object):
         """供应方"""
         async with AsyncSessionMaker() as session:
             config: Config = await ConfigCurd.getConfig(session)
-            return "\n" + config.provide_desc
+            return config.provide_desc
 
     async def REQUIRE(self) -> str:
         """需求方"""
         async with AsyncSessionMaker() as session:
             config: Config = await ConfigCurd.getConfig(session)
-            return "\n" + config.require_desc
+            return config.require_desc
 
     async def onceCost(self) -> float:
         async with AsyncSessionMaker() as session:
@@ -267,6 +284,15 @@ class Content(object):
             InlineButton(text="200", callback_data=f"{CallBackData.PAY}/200"),
             InlineButton(text="500", callback_data=f"{CallBackData.PAY}/500"),
         )
+        return keyboard
+
+    def chooseProvideOrRequireButton(self) -> InlineKeyboardMarkup:
+        keyboard = InlineKeyboard()
+        keyboard.row(
+            InlineButton(text="⭕供给", callback_data=f"{CallBackData.PROVIDE}"),
+            InlineButton(text="✔需求", callback_data=f"{CallBackData.REQUIRE}"),
+        )
+
         return keyboard
 
     def channelButton(self) -> InlineKeyboardMarkup:
@@ -333,27 +359,65 @@ async def handle_callback_query(client: Client, callback_query: CallbackQuery):
 
     # 返回
     if callback_query.data == CallBackData.RETURN:
-        await callback_query.message.reply_text(
-            text=await content.start(), reply_markup=content.KEYBOARD()
+        await callback_query.message.edit(
+            text=await content.start(),
         )
+
+    # 选择需求
+    if callback_query.data == CallBackData.REQUIRE:
+        await callback_query.message.delete(revoke=True)
+
+        await callback_query.message.reply(
+            text=f"需求模板如下,点击可以复制,回复此信息发送:\n<code>{await content.REQUIRE()}</code>",
+            reply_markup=ForceReply(
+                selective=False, placeholder=f"请按照格式回复需求内容"
+            ),
+        )
+
+    # 选择供给
+    if callback_query.data == CallBackData.PROVIDE:
+        await callback_query.message.delete(revoke=True)
+
+        await callback_query.message.reply(
+            text=f"供给模板如下,点击可以复制,回复此信息发送:\n<code>{await content.PROVIDE()}</code>",
+            reply_markup=ForceReply(
+                selective=False, placeholder=f"请按照格式回复供给内容"
+            ),
+        )
+
     # 充值
     elif callback_query.data.startswith(CallBackData.PAY):  # type: ignore
-        amount: str = callback_query.data.split("/")[-1]  # type: ignore
-
-        trade_id, actual_amount, token = await epsdk.createPay(amount=amount)
         async with AsyncSessionMaker() as session:
+            config = await ConfigCurd.getConfig(session)
+            # 新建一个用户对象防止用户没有注册
+            user = await UserCurd.registerUser(
+                session,
+                user=User(
+                    username=callback_query.from_user.username,
+                    user_id=callback_query.from_user.id,
+                ),
+            )
+
+            amount: str = callback_query.data.split("/")[-1]  # type: ignore
+
+            trade_id, actual_amount, token = await epsdk.createPay(
+                amount=amount
+            )
             pay = Pay(
-                user_id=callback_query.from_user.id,
+                user_id=user.user_id,
                 trade_id=trade_id,
                 amount=amount,
             )
             rePay = await PayCurd.createNewPay(session, pay=pay)
 
-        await callback_query.message.edit(
-            text=content.PAY_INFO(
-                pay=rePay, actual_amount=actual_amount, token=token
+            await callback_query.message.edit(
+                text=content.PAY_INFO(
+                    pay=rePay,
+                    actual_amount=actual_amount,
+                    token=token,
+                    config=config,
+                )
             )
-        )
 
 
 @app.on_message(
@@ -372,39 +436,27 @@ async def start(client: Client, message: Message):
 @capture_err
 async def choose_privide_or_require(client: Client, message: Message):
     await message.reply(
-        text="请选择需求还是供应",
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton(  # Generates a callback query when pressed
-                        "供给模板",
-                        switch_inline_query_current_chat=await content.PROVIDE(),
-                    ),
-                    InlineKeyboardButton(  # Generates a callback query when pressed
-                        "需求模板",
-                        switch_inline_query_current_chat=await content.REQUIRE(),
-                    ),
-                ],
-            ]
-        ),
+        text="请选择需求还是供应", reply_markup=content.chooseProvideOrRequireButton()
     )
 
 
-@app.on_message(filters=filters.regex(r"^@.*") & filters.private & ~filters.me)
+@app.on_message(filters=filters.reply & filters.private & ~filters.me)
 @capture_err
-async def send_channel_message(client: Client, message: Message):
-    raw_text = remove_first_line(message.text)
+async def handle_reply_message(client: Client, message: Message):
+    """处理回复的供需信息,并进行发布"""
     # ban word check
     async with AsyncSessionMaker() as session:
         config: Config = await ConfigCurd.getConfig(session)
         matches = [
-            ban_word for ban_word in config.banWordList if ban_word in raw_text
+            ban_word
+            for ban_word in config.banWordList
+            if ban_word in message.text
         ]
         if matches:
             return await message.reply(text=f"您发布的需求中含有违禁词！{matches} 请检查后重新发送！")
 
     msg: Message = await message.reply(
-        text=f"您的供给需求信息,是否确定发送,发送成功后将扣除 {await content.onceCost()} Cion:\n<code>{raw_text}</code>",
+        text=f"您的供给需求信息,是否确定发送,发送成功后将扣除 {await content.onceCost()} 余额:\n<code>{message.text}</code>",
         reply_markup=content.confirmButton(),
     )
     cq: CallbackQuery = await cd.moniterCallback(msg, timeout=30)
@@ -421,25 +473,42 @@ async def send_channel_message(client: Client, message: Message):
 
             config: Config = await ConfigCurd.getConfig(session)
             config = config.replaceConfig(
-                custom=CustomParam(sendCountent=raw_text, count=user.count + 1)
+                custom=CustomParam(
+                    sendCountent=message.text, count=user.count + 1
+                )
             )
 
-            await client.send_message(
-                chat_id=try_int(config.channel_id),
-                text=config.send_content,
-                reply_markup=content.channelButton(),
-            )
+            # add send author
+            send_content_review = f"{config.send_content}\n{user.getUserLink()}"
+
+            # support multi channel
+            send_msg_links = []
+            for channel_id in config.sendChannelIDs:
+                send_msg = await client.send_message(
+                    chat_id=channel_id,
+                    text=send_content_review,
+                    reply_markup=content.channelButton(),
+                )
+                send_msg_links.append(send_msg.link)
+
+            send_msg_links = ",".join(send_msg_links)
 
             # 发送成功后付费
             user_end = await UserCurd.pay(session, user)
             # 并记录用户发送的信息
-            send_msg: Msg = await MsgCURD.addMsg(
-                session, msg=Msg(user_id=user_end.user_id, content=raw_text)
+            store_send_msg: Msg = await MsgCURD.addMsg(
+                session,
+                msg=Msg(
+                    user_id=user_end.user_id,
+                    content=message.text,
+                    amount=config.once_cost,
+                    url=str(send_msg_links),
+                ),
             )
 
             await session.commit()
             await msg.edit_text(
-                text=f"供需发送频道成功,您的信息:\n{content.USER_INFO(user_end)}\n发送时间:{send_msg.send_at}"
+                text=f"供需发送频道成功,您的信息:\n{content.USER_INFO(user_end)} \n发送时间:{store_send_msg.send_at}\n扣除余额:{store_send_msg.amount}\n频道链接:{store_send_msg.url}"
             )
 
 
@@ -465,12 +534,36 @@ async def account_info(client: Client, message: Message):
         user = await UserCurd.getUserByID(session, user_id=message.from_user.id)
         if not user:
             await message.reply_text("用户未注册!正在注册!")
+            user = await UserCurd.registerUser(
+                session, user=User.generateUser(message)
+            )
 
-        user = await UserCurd.registerUser(
-            session, user=User.generateUser(message)
-        )
+        # 调出用户的充值记录
+        pay_string_list = user.getUserPays()
+        string = "\n".join(pay_string_list)
 
-        await message.reply_text(f"{content.USER_INFO(user)}")
+        await message.reply_text(f"{content.USER_INFO(user)}\n支付记录:\n{string}")
+
+
+@app.on_message(
+    filters=filters.regex(content.FBJL) & filters.private & ~filters.me
+)
+@capture_err
+async def send_msg_info(client: Client, message: Message):
+    """发布记录"""
+    async with AsyncSessionMaker() as session:
+        user = await UserCurd.getUserByID(session, user_id=message.from_user.id)
+        if not user:
+            await message.reply_text("用户未注册!正在注册!")
+            user = await UserCurd.registerUser(
+                session, user=User.generateUser(message)
+            )
+
+        # 调出用户的充值记录
+        pay_string_list = user.getUserMsg()
+        string = "\n".join(pay_string_list)
+
+        await message.reply_text(f"❤您的发布记录如下❤\n{string}")
 
 
 @app.on_message(filters=filters.command("getID") & ~filters.me)
@@ -480,6 +573,64 @@ async def get_ID(client: Client, message: Message):
 
 
 # ==== Handle end =====
+
+
+def getBeijingTime() -> datetime:
+    """获取北京时间"""
+    utc_now = datetime.utcnow()
+    beijing_offset = timedelta(hours=8)
+    beijing_now = utc_now + beijing_offset
+    return beijing_now
+
+
+def isTimeout(datetime_obj: datetime):
+    """判断是否超时"""
+    now = getBeijingTime()
+    time_difference = now - datetime_obj
+    if time_difference >= timedelta(minutes=9):
+        return True
+    else:
+        return False
+
+
+async def checkPayStatus(session: AsyncSession, client: Client):
+    unNoticePaysRes = await session.execute(
+        select(Pay).where(Pay.notice == False)
+    )
+    unNoticePays = unNoticePaysRes.scalars().all()
+    logger.info(f"当前未提醒的支付数:{len(unNoticePays)}")
+    for unNoticePay in unNoticePays:
+        if unNoticePay.status == 2:
+            noticePay = await PayCurd.noticedUser(session, pay=unNoticePay)
+            await client.send_message(
+                chat_id=int(noticePay.user_id),
+                text=f"订单号:<code>{noticePay.trade_id}</code>\n时间:{noticePay.pay_at}\n请求支付{noticePay.amount}USDT 已经支付成功!👩阿里嘎多！👩",
+            )
+            continue
+        timeout = isTimeout(datetime_obj=unNoticePay.pay_at)
+        if timeout or unNoticePay.status == 3:
+            # 手动设置 status=3 已过期
+            await session.execute(
+                update(Pay)
+                .where(Pay.trade_id == unNoticePay.trade_id)
+                .values(status=3)
+            )
+            noticePay = await PayCurd.noticedUser(session, pay=unNoticePay)
+            await client.send_message(
+                chat_id=int(noticePay.user_id),
+                text=f"订单号:<code>{noticePay.trade_id}</code>\n时间:{noticePay.pay_at}\n请求支付{noticePay.amount} USDT\n**已经超时!请重新发起支付!**",
+            )
+
+
+async def loopCheckPayStatus(client: Client):
+    """循环遍历监听 pays 表,查看是否有用户交易成功或者超时,并发送提醒"""
+    while True:
+        async with AsyncSessionMaker() as session:
+            try:
+                await checkPayStatus(session=session, client=client)
+            except Exception as exc:
+                logger.exception(f"check pay status error:{exc}")
+        await asyncio.sleep(1)
 
 
 async def main():
@@ -511,6 +662,9 @@ type: {"Bot" if user.is_bot else "User"}
             BotCommand("start", "开始"),
         ]
     )
+
+    # 开一个 coroutine 监听
+    asyncio.ensure_future(loopCheckPayStatus(client=app))
 
     await idle()
     await app.stop()

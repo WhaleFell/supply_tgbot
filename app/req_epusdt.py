@@ -62,10 +62,14 @@ class EpusdtSDK(object):
         sign = self.epusdtSign(parameter=data, signKey=self.sign_key)
         data.update({"signature": sign})
         async with httpx.AsyncClient() as client:
-            result = await client.post(
-                url=f"{self.base_url}/api/v1/order/create-transaction",
-                json=data,
-            )
+            try:
+                result = await client.post(
+                    url=f"{self.base_url}/api/v1/order/create-transaction",
+                    json=data,
+                )
+            except Exception as exc:
+                raise EpusdtException(message=f"HTTP Requests ERROR {exc}")
+
             try:
                 jdata = result.json()
             except:

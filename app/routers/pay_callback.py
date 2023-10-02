@@ -57,5 +57,7 @@ async def get_total_amount(
 ) -> PlainTextResponse:
     result = await db.execute(func.sum(Pay.amount))
     total: float = result.scalar()  # type: ignore
+    if total:
+        return PlainTextResponse(content=str(round(total, 2)))
 
-    return PlainTextResponse(content=str(round(total, 2)))
+    return PlainTextResponse(content=str(0))

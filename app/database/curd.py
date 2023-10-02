@@ -85,6 +85,7 @@ class UserCurd(object):
 
     @staticmethod
     async def registerUser(session: AsyncSession, user: User) -> User:
+        """注册新用户,如果用户已经存在就返回用户对象"""
         check_exist = await UserCurd.getUserByID(session, user_id=user.user_id)
         if check_exist:
             return check_exist
@@ -211,6 +212,7 @@ class PayCurd(object):
         session: AsyncSession, epusdt: Epusdt
     ) -> Tuple[Pay, User]:
         """更新订单状态并操作用户的余额"""
+        config = await ConfigCurd.getConfig(session=session)
         pay = await PayCurd.findPayByTradeID(session, trade_id=epusdt.trade_id)
         if pay:
             # 根据后端的返回更新字段
@@ -232,7 +234,7 @@ class PayCurd(object):
             await session.commit()
             await session.refresh(pay)
             user = await UserCurd.increaseUserAmount(
-                session, user_id=pay.user_id, value=pay.amount
+                session, user_id=pay.user_id, value=pay.amount * config.multiple
             )
             return (pay, user)  # type: ignore
 
@@ -245,6 +247,18 @@ class PayCurd(object):
         """获取所有的支付记录"""
         result = await session.scalars(select(Pay))
         return result.all()
+
+    @staticmethod
+    async def noticedUser(session: AsyncSession, pay: Pay) -> Pay:
+        """已经提醒用户了"""
+        logger.info(f"已经提醒:{pay.user_id}的{pay.trade_id}订单")
+        await session.execute(
+            update(Pay).where(Pay.trade_id == pay.trade_id).values(notice=True)
+        )
+        await session.commit()
+        await session.refresh(pay)
+
+        return pay
 
 
 class MsgCURD(object):
