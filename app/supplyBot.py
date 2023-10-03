@@ -515,7 +515,7 @@ async def send_media_proreq(
                         session,
                         msg=Msg(
                             user_id=user_end.user_id,
-                            content=message.text,
+                            content=content_msg.text,
                             amount=config.once_cost,
                             url=str(send_msg_links),
                         ),
