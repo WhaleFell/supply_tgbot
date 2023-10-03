@@ -501,7 +501,7 @@ async def send_media_proreq(
                             media_msg=media_msg,
                             chat_id=channel_id,
                             caption=send_content_review,
-                            reply_markup=content.confirmButton(),
+                            reply_markup=await content.channelButton(client),
                         )
                         if send_msg:
                             send_msg_links.append(send_msg.link)
