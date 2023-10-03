@@ -43,13 +43,14 @@ from pyrogram.types import (
     InlineKeyboardButton,
     ForceReply,
 )
-from pyrogram.enums import ParseMode
+from pyrogram.enums import ParseMode, MessageMediaType
 from pyrogram.errors import exceptions as pyroExc
+from pyrogram import types
 
 # ====== pyrogram end =====
 
 from contextlib import closing, suppress
-from typing import List, Union, Any, Optional
+from typing import List, Union, Any, Optional, BinaryIO
 from typing_extensions import Annotated
 from pathlib import Path
 import asyncio
@@ -199,6 +200,8 @@ class CallBackData:
     PROVIDE: str = "provide"
     REQUIRE: str = "require"
 
+    MEDIAPROREQ: str = "mediaProReq"
+
 
 class Content(object):
     ZZFB = "💫自助发布"
@@ -267,6 +270,18 @@ class Content(object):
             config: Config = await ConfigCurd.getConfig(session)
             return config.require_desc
 
+    async def MEDIAPROREQ(self) -> str:
+        """图文供需"""
+        string = f"""
+发布图文供需也要严格按照供需格式来哦,点击可以复制.
+供应格式:
+<code>{await self.PROVIDE()}</code>
+
+需求格式:
+<code>{await self.REQUIRE()}</code>
+"""
+        return string
+
     async def onceCost(self) -> float:
         async with AsyncSessionMaker() as session:
             config: Config = await ConfigCurd.getConfig(session)
@@ -302,6 +317,11 @@ class Content(object):
         keyboard.row(
             InlineButton(text="⭕供给", callback_data=f"{CallBackData.PROVIDE}"),
             InlineButton(text="✔需求", callback_data=f"{CallBackData.REQUIRE}"),
+        )
+        keyboard.row(
+            InlineButton(
+                text="💯图文供需", callback_data=f"{CallBackData.MEDIAPROREQ}"
+            )
         )
 
         return keyboard
@@ -360,6 +380,155 @@ def remove_first_line(text: str) -> str:
 # ====== helper function end ====
 
 
+async def send_media_msg(
+    client: Client,
+    media_msg: Message,
+    chat_id: int,
+    caption: str,
+    reply_markup=None,
+):
+    if media_msg.media == MessageMediaType.STICKER:
+        file_id = media_msg.sticker.file_id
+        file_byte: Union[BinaryIO, str, None] = await client.download_media(
+            message=file_id, in_memory=True, file_name="test.jpg"
+        )
+        if file_byte:
+            return await client.send_photo(
+                chat_id=chat_id,
+                photo=file_byte,
+                caption=caption,
+                reply_markup=reply_markup,  # type:ignore
+            )
+
+    elif media_msg.media == MessageMediaType.PHOTO:
+        file_id = media_msg.photo.file_id
+        return await client.send_photo(
+            chat_id=chat_id,
+            photo=file_id,
+            caption=caption,
+            reply_markup=reply_markup,  # type:ignore
+        )
+    elif media_msg.media == MessageMediaType.VIDEO:
+        file_id = media_msg.video.file_id
+        return await client.send_video(
+            chat_id=chat_id,
+            video=file_id,
+            caption=caption,
+            reply_markup=reply_markup,  # type:ignore
+        )
+
+    return None
+
+
+async def send_media_proreq(
+    client: Client, message: Message, from_user: types.User
+):
+    """发布图文供需"""
+
+    await message.reply(
+        text=await content.MEDIAPROREQ(), reply_markup=content.KEYBOARD()
+    )
+    content_msg: Optional[Message] = await askQuestion(
+        queston="第一步:发送按格式供需文本（限时120s）",
+        client=client,
+        message=message,
+        timeout=120,
+    )
+    if content_msg:
+        async with AsyncSessionMaker() as session:
+            config: Config = await ConfigCurd.getConfig(session)
+            matches = [
+                ban_word
+                for ban_word in config.banWordList
+                if ban_word in content_msg.text
+            ]
+            if matches:
+                return await content_msg.reply(
+                    text=f"您发布的内容中含有违禁词！{matches} 请检查后重新发送！",
+                    reply_markup=content.KEYBOARD(),
+                )
+        media_msg: Optional[Message] = await askQuestion(
+            queston=f"第一步已经完成,您的信息:\n<code>\n{content_msg.text}\n</code>\n\n 第二步就要发送你的图片/视频/贴纸（限时120s）",
+            client=client,
+            message=message,
+            timeout=120,
+        )
+        if media_msg:
+            msg: Optional[Message] = await send_media_msg(
+                client=client,
+                media_msg=media_msg,
+                chat_id=message.chat.id,
+                caption=content_msg.text + "\n以上是你发送到频道的信息,请再三确认\n",
+                reply_markup=content.confirmButton(),
+            )
+            if not msg:
+                return await message.reply("请发送图片/视频/贴纸!")
+            cq: CallbackQuery = await cd.moniterCallback(msg, timeout=30)
+
+            if cq.data == CallBackData.YES:
+                async with AsyncSessionMaker() as session:
+                    user = await UserCurd.registerUser(
+                        session,
+                        user=User(
+                            username=from_user.username, user_id=from_user.id
+                        ),
+                    )
+
+                    if user.amount <= 0:
+                        await message.reply(
+                            "💔💔💔对不起,你的没钱了,赶紧充值！！！",
+                            reply_markup=content.KEYBOARD(),
+                        )
+                        return
+
+                    config: Config = await ConfigCurd.getConfig(session)
+                    config = config.replaceConfig(
+                        custom=CustomParam(
+                            sendCountent=content_msg.text, count=user.count + 1
+                        )
+                    )
+
+                    # add send author
+                    send_content_review = (
+                        f"{config.send_content}\n{user.getUserLink()}"
+                    )
+
+                    # support multi channel
+                    send_msg_links = []
+                    for channel_id in config.sendChannelIDs:
+                        send_msg: Optional[Message] = await send_media_msg(
+                            client=client,
+                            media_msg=media_msg,
+                            chat_id=channel_id,
+                            caption=send_content_review,
+                            reply_markup=content.confirmButton(),
+                        )
+                        if send_msg:
+                            send_msg_links.append(send_msg.link)
+
+                    send_msg_links = ",".join(send_msg_links)
+
+                    # 发送成功后付费
+                    user_end = await UserCurd.pay(session, user)
+                    # 并记录用户发送的信息
+                    store_send_msg: Msg = await MsgCURD.addMsg(
+                        session,
+                        msg=Msg(
+                            user_id=user_end.user_id,
+                            content=message.text,
+                            amount=config.once_cost,
+                            url=str(send_msg_links),
+                        ),
+                    )
+
+                    await session.commit()
+                    await msg.delete()
+                    await message.reply(
+                        text=f"供需发送频道成功,您的信息:\n{content.USER_INFO(user_end)} \n发送时间:{store_send_msg.send_at}\n扣除余额:{store_send_msg.amount}\n频道链接:{store_send_msg.url}",
+                        reply_markup=content.KEYBOARD(),
+                    )
+
+
 # ===== Handle ======
 
 
@@ -386,7 +555,7 @@ async def handle_callback_query(client: Client, callback_query: CallbackQuery):
             ),
         )
 
-    # 选择供给
+    # 发送普通供需
     if callback_query.data == CallBackData.PROVIDE:
         await callback_query.message.delete(revoke=True)
 
@@ -431,6 +600,14 @@ async def handle_callback_query(client: Client, callback_query: CallbackQuery):
                 )
             )
 
+    # 发送图文供需
+    elif callback_query.data == CallBackData.MEDIAPROREQ:
+        await send_media_proreq(
+            client=client,
+            message=callback_query.message,
+            from_user=callback_query.from_user,
+        )
+
 
 @app.on_message(
     filters=filters.command("start") & filters.private & ~filters.me
@@ -448,7 +625,8 @@ async def start(client: Client, message: Message):
 @capture_err
 async def choose_privide_or_require(client: Client, message: Message):
     await message.reply(
-        text="请选择需求还是供应", reply_markup=content.chooseProvideOrRequireButton()
+        text="请选择需求还是供应,新增图文供需功能！！",
+        reply_markup=content.chooseProvideOrRequireButton(),
     )
 
 
@@ -457,6 +635,60 @@ def contains_all_keywords(string, keywords: List[str]) -> bool:
         if keyword not in string:
             return False
     return True
+
+
+async def send_common_msg_to_channel(
+    session: AsyncSession, message: Message, client: Client, delMsg: Message
+):
+    """发送普通信息到供需频道"""
+    user = await UserCurd.registerUser(session, user=User.generateUser(message))
+
+    if user.amount <= 0:
+        await message.reply(
+            "💔💔💔对不起,你的没钱了,赶紧充值！！！", reply_markup=content.KEYBOARD()
+        )
+        return
+
+    config: Config = await ConfigCurd.getConfig(session)
+    config = config.replaceConfig(
+        custom=CustomParam(sendCountent=message.text, count=user.count + 1)
+    )
+
+    # add send author
+    send_content_review = f"{config.send_content}\n{user.getUserLink()}"
+
+    # support multi channel
+    send_msg_links = []
+    for channel_id in config.sendChannelIDs:
+        send_msg = await client.send_message(
+            chat_id=channel_id,
+            text=send_content_review,
+            reply_markup=await content.channelButton(client),
+            disable_web_page_preview=True,
+        )
+        send_msg_links.append(send_msg.link)
+
+    send_msg_links = ",".join(send_msg_links)
+
+    # 发送成功后付费
+    user_end = await UserCurd.pay(session, user)
+    # 并记录用户发送的信息
+    store_send_msg: Msg = await MsgCURD.addMsg(
+        session,
+        msg=Msg(
+            user_id=user_end.user_id,
+            content=message.text,
+            amount=config.once_cost,
+            url=str(send_msg_links),
+        ),
+    )
+
+    await session.commit()
+    await delMsg.delete()
+    await message.reply(
+        text=f"供需发送频道成功,您的信息:\n{content.USER_INFO(user_end)} \n发送时间:{store_send_msg.send_at}\n扣除余额:{store_send_msg.amount}\n频道链接:{store_send_msg.url}",
+        reply_markup=content.KEYBOARD(),
+    )
 
 
 @app.on_message(filters=filters.reply & filters.private & ~filters.me)
@@ -496,57 +728,8 @@ async def handle_reply_message(client: Client, message: Message):
 
     if cq.data == CallBackData.YES:
         async with AsyncSessionMaker() as session:
-            user = await UserCurd.registerUser(
-                session, user=User.generateUser(message)
-            )
-
-            if user.amount <= 0:
-                await message.reply(
-                    "💔💔💔对不起,你的没钱了,赶紧充值！！！", reply_markup=content.KEYBOARD()
-                )
-                return
-
-            config: Config = await ConfigCurd.getConfig(session)
-            config = config.replaceConfig(
-                custom=CustomParam(
-                    sendCountent=message.text, count=user.count + 1
-                )
-            )
-
-            # add send author
-            send_content_review = f"{config.send_content}\n{user.getUserLink()}"
-
-            # support multi channel
-            send_msg_links = []
-            for channel_id in config.sendChannelIDs:
-                send_msg = await client.send_message(
-                    chat_id=channel_id,
-                    text=send_content_review,
-                    reply_markup=await content.channelButton(client),
-                    disable_web_page_preview=True,
-                )
-                send_msg_links.append(send_msg.link)
-
-            send_msg_links = ",".join(send_msg_links)
-
-            # 发送成功后付费
-            user_end = await UserCurd.pay(session, user)
-            # 并记录用户发送的信息
-            store_send_msg: Msg = await MsgCURD.addMsg(
-                session,
-                msg=Msg(
-                    user_id=user_end.user_id,
-                    content=message.text,
-                    amount=config.once_cost,
-                    url=str(send_msg_links),
-                ),
-            )
-
-            await session.commit()
-            await msg.delete()
-            await message.reply(
-                text=f"供需发送频道成功,您的信息:\n{content.USER_INFO(user_end)} \n发送时间:{store_send_msg.send_at}\n扣除余额:{store_send_msg.amount}\n频道链接:{store_send_msg.url}",
-                reply_markup=content.KEYBOARD(),
+            await send_common_msg_to_channel(
+                session, message=message, client=client, delMsg=msg
             )
 
 
@@ -648,7 +831,7 @@ async def checkPayStatus(session: AsyncSession, client: Client):
         select(Pay).where(Pay.notice == False)
     )
     unNoticePays = unNoticePaysRes.scalars().all()
-    logger.info(f"当前未提醒的支付数:{len(unNoticePays)}")
+    # logger.info(f"当前未提醒的支付数:{len(unNoticePays)}")
     for unNoticePay in unNoticePays:
         if unNoticePay.status == 2:
             noticePay = await PayCurd.noticedUser(session, pay=unNoticePay)
