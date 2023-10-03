@@ -306,11 +306,12 @@ class Content(object):
 
         return keyboard
 
-    def channelButton(self) -> InlineKeyboardMarkup:
+    async def channelButton(self, client: Client) -> InlineKeyboardMarkup:
         """添加到频道的按钮"""
+        me = await client.get_me()
         keyboard = InlineKeyboard()
         keyboard.row(
-            InlineButton(text="供给自助发布", url="https://t.me/WFTest8964Bot"),
+            InlineButton(text="供给自助发布", url=f"https://t.me/{me.username}"),
         )
         return keyboard
 
@@ -521,7 +522,7 @@ async def handle_reply_message(client: Client, message: Message):
                 send_msg = await client.send_message(
                     chat_id=channel_id,
                     text=send_content_review,
-                    reply_markup=content.channelButton(),
+                    reply_markup=await content.channelButton(client),
                     disable_web_page_preview=True,
                 )
                 send_msg_links.append(send_msg.link)
