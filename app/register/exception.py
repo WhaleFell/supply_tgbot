@@ -8,8 +8,10 @@ import traceback
 from fastapi import FastAPI, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import ORJSONResponse
+from fastapi.responses import ORJSONResponse, RedirectResponse
 from urllib.parse import parse_qsl
+
+# from app.register.login import NotAuthenticatedException
 
 # ALL Exception
 from starlette.exceptions import (
@@ -123,6 +125,15 @@ def register_exception(app: FastAPI):
     #     return ORJSONResponse(
     #         BaseResp(code=500, msg=f"HTTP Error:{exc}").model_dump()
     #     )
+
+    # @app.exception_handler(NotAuthenticatedException)
+    # async def auth_exception_handler(
+    #     request: Request, exc: NotAuthenticatedException
+    # ) -> RedirectResponse:
+    #     """
+    #     Redirect the user to the login page if not logged in
+    #     """
+    #     return RedirectResponse(url="/login")
 
     @app.exception_handler(Exception)
     async def http_exception_handler(

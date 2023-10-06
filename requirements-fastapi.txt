@@ -10,4 +10,4 @@ aiomysql
 pymysql
 orjson
 python-multipart
-pyfa_converter
+fastapi-login

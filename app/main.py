@@ -14,6 +14,7 @@ from app.register import (
     register_router,
     register_exception,
     register_middleware,
+    register_mount,
 )
 from app.utils.custom_log import logger
 
@@ -41,6 +42,7 @@ register_cors(app)  # 注册跨域请求
 register_router(app)  # 注册路由
 register_exception(app)  # 注册异常捕获
 register_middleware(app)  # 注册请求响应拦截
+register_mount(app)  # 挂载静态文件
 
 
 try:

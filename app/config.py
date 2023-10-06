@@ -18,12 +18,16 @@ ROOTPATH: Path = Path().absolute().parent
 class Settings(BaseSettings):
     PROJECT_DESC: str = "🎉 接口汇总 🎉"  # 描述
     PROJECT_VERSION: str = "1.0"  # 版本
+    PROJECT_PATH: str = os.getcwd()
 
     # 末尾不能有 /
     # http://usa1.whaleluo.top:8445
     EPUSDT_BACKEND: str = "http://usa1.whaleluo.top:8445"
     EPUSDT_CALLBACK_URL: str = "http://192.168.8.219:8000/pay/callback"
     EPUSDT_KEY: str = "lovehyy9420"
+
+    # fastapi-login seek
+    SECRET: str = "super-secret-key"
 
     # 跨域请求(务必指定精确ip, 不要用localhost)
     CORS_ORIGINS: Union[List[AnyHttpUrl], List[str]] = ["*"]
