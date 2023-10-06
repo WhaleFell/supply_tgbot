@@ -5,7 +5,8 @@
 # @desc : Fastapi-login 配置
 
 from fastapi import FastAPI
-from fastapi_login import LoginManager
+
+# from fastapi_login import LoginManager
 from app.config import settings
 from app.database.curd import ConfigCurd
 from app.database.connect import AsyncSessionMaker
