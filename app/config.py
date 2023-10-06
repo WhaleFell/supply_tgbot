@@ -18,7 +18,7 @@ ROOTPATH: Path = Path().absolute().parent
 class Settings(BaseSettings):
     PROJECT_DESC: str = "🎉 接口汇总 🎉"  # 描述
     PROJECT_VERSION: str = "1.0"  # 版本
-    PROJECT_PATH: str = os.getcwd()
+    PROJECT_PATH: str = ROOTPATH.as_posix()
 
     # 末尾不能有 /
     # http://usa1.whaleluo.top:8445
