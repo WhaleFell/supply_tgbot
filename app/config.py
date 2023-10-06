@@ -11,7 +11,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 # 应用路径
-ROOTPATH: Path = Path().absolute().parent
+ROOTPATH: Path = Path(__file__).absolute().parent
 
 
 # https://docs.pydantic.dev/usage/settings/
