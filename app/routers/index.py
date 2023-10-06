@@ -18,7 +18,7 @@ from pathlib import Path
 from app.config import settings
 
 # from app.register.login import manager, query_user
-from fastapi_login.exceptions import InvalidCredentialsException
+# from fastapi_login.exceptions import InvalidCredentialsException
 
 router = APIRouter()
 
