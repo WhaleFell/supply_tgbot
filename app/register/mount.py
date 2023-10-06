@@ -13,6 +13,6 @@ def register_mount(app: FastAPI):
     """挂载静态文件"""
     app.mount(
         "/assets",
-        StaticFiles(directory=Path(settings.PROJECT_PATH, "assets")),
+        StaticFiles(directory=Path(settings.PROJECT_PATH, "assets").as_posix()),
         name="assets",
     )
