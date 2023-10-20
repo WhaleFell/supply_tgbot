@@ -1,5 +1,12 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python
+# -*-coding:utf-8 -*-
+"""
+@File    :   cors.py
+@Time    :   2023/10/12 10:38:33
+@Author  :   WhaleFall
+@License :   (C)Copyright 2020-2023, WhaleFall
+@Desc    :   register/cors.py 处理跨域请求
+"""
 
 # register/cors.py 处理跨域请求
 
@@ -15,7 +22,7 @@ def register_cors(app: FastAPI):
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[str(origin) for origin in settings.CORS_ORIGINS],
-        allow_credentials=True,
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )

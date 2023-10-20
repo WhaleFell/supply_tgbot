@@ -72,7 +72,7 @@ from datetime import datetime, timedelta
 # ====== Config ========
 ROOTPATH: Path = Path(__file__).parent.absolute()
 DEBUG = True
-NAME = os.environ.get("NAME") or "WFTest8964Bot"
+NAME = os.environ.get("NAME") or "session"
 # SQLTIE3 sqlite+aiosqlite:///database.db  # 数据库文件名为 database.db 不存在的新建一个
 # 异步 mysql+aiomysql://user:password@host:port/dbname
 API_ID = 21341224
