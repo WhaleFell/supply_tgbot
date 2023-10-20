@@ -434,99 +434,104 @@ async def send_media_proreq(
         message=message,
         timeout=120,
     )
-    if content_msg:
+    if not content_msg:
+        return
+    if not content_msg.text:
+        return await message.reply("无法识别出文字???")
+
+    async with AsyncSessionMaker() as session:
+        config: Config = await ConfigCurd.getConfig(session)
+        matches = [
+            ban_word
+            for ban_word in config.banWordList
+            if ban_word in content_msg.text
+        ]
+        if matches:
+            return await content_msg.reply(
+                text=f"您发布的内容中含有违禁词！{matches} 请检查后重新发送！",
+                reply_markup=content.KEYBOARD(),
+            )
+
+    media_msg: Optional[Message] = await askQuestion(
+        queston=f"第一步已经完成,您的信息:\n<code>\n{content_msg.text}\n</code>\n\n 第二步就要发送你的图片/视频/贴纸（限时120s）",
+        client=client,
+        message=message,
+        timeout=120,
+    )
+
+    if not media_msg:
+        return
+
+    msg: Optional[Message] = await send_media_msg(
+        client=client,
+        media_msg=media_msg,
+        chat_id=message.chat.id,
+        caption=content_msg.text
+        + f"\n**以上是你发送到频道的信息,发送图文供需需要消耗:{config.pic_once_cost} USDT,请再三确认**\n",
+        reply_markup=content.confirmButton(),
+    )
+    if not msg:
+        return await message.reply("请发送图片/视频/贴纸!")
+    cq: CallbackQuery = await cd.moniterCallback(msg, timeout=30)
+
+    if cq.data == CallBackData.YES:
         async with AsyncSessionMaker() as session:
-            config: Config = await ConfigCurd.getConfig(session)
-            matches = [
-                ban_word
-                for ban_word in config.banWordList
-                if ban_word in content_msg.text
-            ]
-            if matches:
-                return await content_msg.reply(
-                    text=f"您发布的内容中含有违禁词！{matches} 请检查后重新发送！",
+            user = await UserCurd.registerUser(
+                session,
+                user=User(username=from_user.username, user_id=from_user.id),
+            )
+
+            if user.amount <= 0:
+                await message.reply(
+                    "💔💔💔对不起,你的没钱了,赶紧充值！！！",
                     reply_markup=content.KEYBOARD(),
                 )
-        media_msg: Optional[Message] = await askQuestion(
-            queston=f"第一步已经完成,您的信息:\n<code>\n{content_msg.text}\n</code>\n\n 第二步就要发送你的图片/视频/贴纸（限时120s）",
-            client=client,
-            message=message,
-            timeout=120,
-        )
-        if media_msg:
-            msg: Optional[Message] = await send_media_msg(
-                client=client,
-                media_msg=media_msg,
-                chat_id=message.chat.id,
-                caption=content_msg.text + "\n以上是你发送到频道的信息,请再三确认\n",
-                reply_markup=content.confirmButton(),
+                return
+
+            config: Config = await ConfigCurd.getConfig(session)
+            config = config.replaceConfig(
+                custom=CustomParam(
+                    sendCountent=content_msg.text, count=user.count + 1
+                )
             )
-            if not msg:
-                return await message.reply("请发送图片/视频/贴纸!")
-            cq: CallbackQuery = await cd.moniterCallback(msg, timeout=30)
 
-            if cq.data == CallBackData.YES:
-                async with AsyncSessionMaker() as session:
-                    user = await UserCurd.registerUser(
-                        session,
-                        user=User(
-                            username=from_user.username, user_id=from_user.id
-                        ),
-                    )
+            # add send author
+            send_content_review = f"{config.send_content}\n{user.getUserLink()}"
 
-                    if user.amount <= 0:
-                        await message.reply(
-                            "💔💔💔对不起,你的没钱了,赶紧充值！！！",
-                            reply_markup=content.KEYBOARD(),
-                        )
-                        return
+            # support multi channel
+            send_msg_links = []
+            for channel_id in config.sendChannelIDs:
+                send_msg: Optional[Message] = await send_media_msg(
+                    client=client,
+                    media_msg=media_msg,
+                    chat_id=channel_id,
+                    caption=send_content_review,
+                    reply_markup=await content.channelButton(client),
+                )
+                if send_msg:
+                    send_msg_links.append(send_msg.link)
 
-                    config: Config = await ConfigCurd.getConfig(session)
-                    config = config.replaceConfig(
-                        custom=CustomParam(
-                            sendCountent=content_msg.text, count=user.count + 1
-                        )
-                    )
+            send_msg_links = ",".join(send_msg_links)
 
-                    # add send author
-                    send_content_review = (
-                        f"{config.send_content}\n{user.getUserLink()}"
-                    )
+            # 发送成功后付费
+            user_end = await UserCurd.payPic(session, user)
+            # 并记录用户发送的信息
+            store_send_msg: Msg = await MsgCURD.addMsg(
+                session,
+                msg=Msg(
+                    user_id=user_end.user_id,
+                    content=content_msg.text,
+                    amount=config.pic_once_cost,
+                    url=str(send_msg_links),
+                ),
+            )
 
-                    # support multi channel
-                    send_msg_links = []
-                    for channel_id in config.sendChannelIDs:
-                        send_msg: Optional[Message] = await send_media_msg(
-                            client=client,
-                            media_msg=media_msg,
-                            chat_id=channel_id,
-                            caption=send_content_review,
-                            reply_markup=await content.channelButton(client),
-                        )
-                        if send_msg:
-                            send_msg_links.append(send_msg.link)
-
-                    send_msg_links = ",".join(send_msg_links)
-
-                    # 发送成功后付费
-                    user_end = await UserCurd.pay(session, user)
-                    # 并记录用户发送的信息
-                    store_send_msg: Msg = await MsgCURD.addMsg(
-                        session,
-                        msg=Msg(
-                            user_id=user_end.user_id,
-                            content=content_msg.text,
-                            amount=config.once_cost,
-                            url=str(send_msg_links),
-                        ),
-                    )
-
-                    await session.commit()
-                    await msg.delete()
-                    await message.reply(
-                        text=f"供需发送频道成功,您的信息:\n{content.USER_INFO(user_end)} \n发送时间:{store_send_msg.send_at}\n扣除余额:{store_send_msg.amount}\n频道链接:{store_send_msg.url}",
-                        reply_markup=content.KEYBOARD(),
-                    )
+            await session.commit()
+            await msg.delete()
+            await message.reply(
+                text=f"供需发送频道成功,您的信息:\n{content.USER_INFO(user_end)} \n发送时间:{store_send_msg.send_at}\n扣除余额:{store_send_msg.amount}\n频道链接:{store_send_msg.url}",
+                reply_markup=content.KEYBOARD(),
+            )
 
 
 # ===== Handle ======
@@ -671,7 +676,7 @@ async def send_common_msg_to_channel(
     send_msg_links = ",".join(send_msg_links)
 
     # 发送成功后付费
-    user_end = await UserCurd.pay(session, user)
+    user_end = await UserCurd.payCommon(session, user)
     # 并记录用户发送的信息
     store_send_msg: Msg = await MsgCURD.addMsg(
         session,
@@ -721,7 +726,7 @@ async def handle_reply_message(client: Client, message: Message):
             )
 
     msg: Message = await message.reply(
-        text=f"您的供给需求信息,是否确定发送,发送成功后将扣除 {await content.onceCost()} 余额:\n<code>{message.text}</code>",
+        text=f"您的普通供给需求信息,是否确定发送,发送成功后将扣除 {config.once_cost} 余额:\n<code>{message.text}</code>",
         reply_markup=content.confirmButton(),
     )
     cq: CallbackQuery = await cd.moniterCallback(msg, timeout=30)

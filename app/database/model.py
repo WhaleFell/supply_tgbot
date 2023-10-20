@@ -219,14 +219,20 @@ class Config(Base):
     once_cost: Mapped[float] = mapped_column(
         Float(precision=2),
         default=2,
-        comment="一次发送消耗的 USDT",
+        comment="一次发送普通供需消耗的 USDT",
+    )
+
+    pic_once_cost: Mapped[float] = mapped_column(
+        Float(precision=2),
+        default=5,
+        comment="一次发送图文消耗的 USDT",
     )
 
     channel_ids: Mapped[str] = mapped_column(
         String(1000),
         comment="机器人需要发送的 channel ids 用逗号分隔",
         nullable=False,
-        default="-1001858197255,",
+        default="-1001558383712,",
     )
 
     usdt_token: Mapped[str] = mapped_column(
@@ -262,10 +268,12 @@ class Config(Base):
             id=self.id,
             admin_password=self.admin_password,
             description=self.description.replace(
-                "【每次消耗的USDT】", str(self.once_cost)
-            ).replace(
+                "【普通供需消耗USDT】", str(self.once_cost)
+            )
+            .replace(
                 "【当前时间】", custom.currentTime.strftime(r"%Y-%m-%d %H:%M:%S")
-            ),
+            )
+            .replace("【图文供需消耗USDT】", str(self.pic_once_cost)),
             provide_desc=self.provide_desc,
             require_desc=self.require_desc,
             send_content=self.send_content.replace("【发表次数】", str(custom.count))

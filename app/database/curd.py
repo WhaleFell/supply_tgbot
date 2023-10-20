@@ -165,11 +165,25 @@ class UserCurd(object):
         return None
 
     @staticmethod
-    async def pay(session: AsyncSession, user: User) -> User:
-        """增加一次次数并扣除对应的金额,返回用户对象"""
+    async def payCommon(session: AsyncSession, user: User) -> User:
+        """发送普通供需增加一次次数并扣除对应的金额,返回用户对象"""
         config = await ConfigCurd.getConfig(session)
         await UserCurd.increaseUserAmount(
             session, user_id=user.user_id, value=-config.once_cost
+        )
+        await UserCurd.addUserCount(session, user_id=user.user_id)
+
+        await session.commit()
+        await session.refresh(user)
+
+        return user
+
+    @staticmethod
+    async def payPic(session: AsyncSession, user: User) -> User:
+        """发送图文供需增加一次次数并扣除对应的金额,返回用户对象"""
+        config = await ConfigCurd.getConfig(session)
+        await UserCurd.increaseUserAmount(
+            session, user_id=user.user_id, value=-config.pic_once_cost
         )
         await UserCurd.addUserCount(session, user_id=user.user_id)
 

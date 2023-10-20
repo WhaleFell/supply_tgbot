@@ -11,7 +11,8 @@ from typing import Optional
 
 
 # parameter
-# 【每次消耗的USDT】
+# 【普通供需消耗USDT】
+# 【图文供需消耗USDT】
 # 【发表次数】
 # 【当前时间】
 # 【用户内容】
@@ -29,6 +30,7 @@ def getBeijingTime() -> datetime:
 
 class CustomParam(BaseModel):
     costAmount: Optional[int] = None
+    picCostAmount: Optional[int] = None
     count: Optional[int] = None
     currentTime: datetime = Field(default_factory=getBeijingTime)
     sendCountent: Optional[str] = None
@@ -36,8 +38,11 @@ class CustomParam(BaseModel):
 
 @dataclass
 class StringTemplate:
-    description: str = """
-发布规则 付费广告 消耗 【每次消耗的USDT】 USDT
+    description: str = """发布规则:
+
+**💥本系统支持普通供需和图文供需：💥**
+普通供需一次消耗 【普通供需消耗USDT】 USDT 
+图文供需一次消耗【图文供需消耗USDT】USDT
 
 发布付费广告严格要求如下
 1：行数限制15行内【超过百分百不通过】
@@ -49,8 +54,7 @@ class StringTemplate:
 供给频道： https://t.me/gcccaasas
 """
     # 供应文案
-    provide_desc: str = """
-项目名称：
+    provide_desc: str = """项目名称：
 项目介绍：
 价格：
 联系人：
@@ -58,23 +62,13 @@ class StringTemplate:
 """
 
     # 需求文案
-    require_desc: str = """
-需求：
+    require_desc: str = """需求：
 预算：
 联系人：
 频道：【选填/没频道可以不填】
 """
 
-    send_content: str = """
-【用户内容】
+    send_content: str = """【用户内容】
 
 该用户累计发布 【发表次数】 次，当前时间：【当前时间】
 """
-
-
-# def loopReplace(string: str, customObj: CustomParam) -> str:
-#     return string.replace("【每次消耗的USDT】", str(customObj.costAmount))
-
-
-# def replace(self, customObj: CustomParam):
-#     return self
